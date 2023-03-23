@@ -129,6 +129,9 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = { .state_changed_
 
 void main(void)
 {
+	//Need to sleep at start for logs to display correctly.
+	k_msleep(1000);
+
 	int ret;
 
 	LOG_INF("Start CoAP-server sample");
