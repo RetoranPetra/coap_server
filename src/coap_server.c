@@ -23,11 +23,11 @@ static struct k_work provisioning_work;
 static struct k_timer led_timer;
 static struct k_timer provisioning_timer;
 
-static void on_light_request(uint8_t command)
+static void on_light_request(uint8_t *command)
 {
 	static uint8_t val;
 
-	switch (command) {
+	switch (command[0]) {
 	case THREAD_COAP_UTILS_LIGHT_CMD_ON:
 		dk_set_led_on(LIGHT_LED);
 		val = 1;

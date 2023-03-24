@@ -127,7 +127,7 @@ static void provisioning_request_handler(void *context, otMessage *message,
 static void light_request_handler(void *context, otMessage *message,
 				  const otMessageInfo *message_info)
 {
-	uint8_t command;
+	uint8_t command[128] = {};
 
 	ARG_UNUSED(context);
 
@@ -140,14 +140,25 @@ static void light_request_handler(void *context, otMessage *message,
 		LOG_ERR("Light handler - Unexpected CoAP code");
 		goto end;
 	}
-
-	if (otMessageRead(message, otMessageGetOffset(message), &command, 1) !=
+/*
+	if (otMessageRead(message, otMessageGetOffset(message), &command, MY_MESSAGE_SIZE)!=
 	    1) {
 		LOG_ERR("Light handler - Missing light command");
 		goto end;
 	}
+*/
 
-	LOG_INF("Received light request: %c", command);
+	otMessageRead(message, otMessageGetOffset(message), &command, MY_MESSAGE_SIZE);
+
+	/*
+	//Makes single char a string for the default light request messages, keeps old functionality.
+	if (command[0] == THREAD_COAP_UTILS_LIGHT_CMD_ON || command[0] == THREAD_COAP_UTILS_LIGHT_CMD_OFF || command[0] == THREAD_COAP_UTILS_LIGHT_CMD_TOGGLE) {
+		command[1] = '\0';
+	}
+	*/
+
+	LOG_INF("Received light request: %s", (char*)command);
+	NET_HEXDUMP_DBG(command,sizeof(command),"Message HEXDUMP: ");
 
 	srv_context.on_light_request(command);
 

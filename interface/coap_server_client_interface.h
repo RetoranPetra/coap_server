@@ -9,6 +9,8 @@
 
 #define COAP_PORT 5683
 
+#define MY_MESSAGE_SIZE 128
+
 /**@brief Enumeration describing light commands. */
 enum light_command {
 	THREAD_COAP_UTILS_LIGHT_CMD_OFF = '0',
