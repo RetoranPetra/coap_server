@@ -22,6 +22,7 @@ struct server_context {
 	bool provisioning_enabled;
 	light_request_callback_t on_light_request;
 	provisioning_request_callback_t on_provisioning_request;
+	generic_request_callback_t on_generic_request;
 };
 
 static struct server_context srv_context = {
@@ -29,6 +30,7 @@ static struct server_context srv_context = {
 	.provisioning_enabled = false,
 	.on_light_request = NULL,
 	.on_provisioning_request = NULL,
+	.on_generic_request = NULL,
 };
 
 /**@brief Definition of CoAP resources for provisioning. */
@@ -45,6 +47,13 @@ static otCoapResource light_resource = {
 	.mHandler = NULL,
 	.mContext = NULL,
 	.mNext = NULL,
+};
+
+static otCoapResource generic_resource = {
+	.mUriPath = GENERIC_URI_PATH,
+	.mHandler = NULL,
+	.mContext = NULL,
+	.mNext = NULL
 };
 
 static otError provisioning_response_send(otMessage *request_message,
@@ -154,6 +163,26 @@ static void light_request_handler(void *context, otMessage *message,
 end:
 	return;
 }
+//m
+//My new handler for just sending text messages to one another.
+static void generic_request_handler(void *context, otMessage *message,
+				 const otMessageInfo *message_info)
+{
+	//Need to do this with malloc if it's going to be accessed outside this function using srv_context.
+	char myBuffer[GENERIC_PAYLOAD_SIZE] = {};
+
+	//otMessageLength could be used in place of generic payload size.
+
+	otMessageRead(message,otMessageGetOffset(message),&myBuffer, GENERIC_PAYLOAD_SIZE);
+
+	ARG_UNUSED(context);
+	ARG_UNUSED(message_info);
+
+	LOG_INF("Message received is:\n%s",myBuffer);
+
+	srv_context.on_generic_request(myBuffer);
+}
+//m/
 
 static void coap_default_handler(void *context, otMessage *message,
 				 const otMessageInfo *message_info)
@@ -182,13 +211,16 @@ bool ot_coap_is_provisioning_active(void)
 }
 
 int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
-		 light_request_callback_t on_light_request)
+		 light_request_callback_t on_light_request, generic_request_callback_t on_generic_request)
 {
 	otError error;
 
 	srv_context.provisioning_enabled = false;
 	srv_context.on_provisioning_request = on_provisioning_request;
 	srv_context.on_light_request = on_light_request;
+	//m
+	srv_context.on_generic_request = on_generic_request;
+	//m/
 
 	srv_context.ot = openthread_get_default_instance();
 	if (!srv_context.ot) {
@@ -203,9 +235,17 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
 	light_resource.mContext = srv_context.ot;
 	light_resource.mHandler = light_request_handler;
 
+	//m
+	generic_resource.mContext = srv_context.ot;
+	generic_resource.mHandler = generic_request_handler;
+	//m/
+
 	otCoapSetDefaultHandler(srv_context.ot, coap_default_handler, NULL);
 	otCoapAddResource(srv_context.ot, &light_resource);
 	otCoapAddResource(srv_context.ot, &provisioning_resource);
+	//m
+	otCoapAddResource(srv_context.ot, &generic_resource);
+	//m/
 
 	error = otCoapStart(srv_context.ot, COAP_PORT);
 	if (error != OT_ERROR_NONE) {

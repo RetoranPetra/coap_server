@@ -124,6 +124,12 @@ static void on_thread_state_changed(otChangedFlags flags, struct openthread_cont
 		}
 	}
 }
+
+static void on_generic_request(otChangedFlags flags, struct openthread_context *ot_context, void *user_data) {
+	//Something to deal with message would normally go here. However, message is just character string so it doesn't matter.
+	LOG_INF("Generic Request event execution!");
+}
+
 static struct openthread_state_changed_cb ot_state_chaged_cb = { .state_changed_cb =
 									 on_thread_state_changed };
 
@@ -141,7 +147,7 @@ void main(void)
 
 	k_work_init(&provisioning_work, activate_provisioning);
 
-	ret = ot_coap_init(&deactivate_provisionig, &on_light_request);
+	ret = ot_coap_init(&deactivate_provisionig, &on_light_request, &on_generic_request);
 	if (ret) {
 		LOG_ERR("Could not initialize OpenThread CoAP");
 		goto end;
@@ -161,6 +167,8 @@ void main(void)
 
 	openthread_state_changed_cb_register(openthread_get_default_context(), &ot_state_chaged_cb);
 	openthread_start(openthread_get_default_context());
+
+	LOG_DBG("Passed openthread_start in main!");
 
 end:
 	return;

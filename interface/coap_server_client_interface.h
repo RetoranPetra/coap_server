@@ -17,6 +17,12 @@ enum light_command {
 };
 
 #define PROVISIONING_URI_PATH "provisioning"
+
+
 #define LIGHT_URI_PATH "light"
+#define LIGHT_PAYLOAD_SIZE 1
+
+#define GENERIC_URI_PATH "generic"
+#define GENERIC_PAYLOAD_SIZE 64
 
 #endif
