@@ -92,6 +92,7 @@ static otError provisioning_response_send(otMessage *request_message,
 		goto end;
 	}
 
+	//Sends response back as a return
 	error = otCoapSendResponse(srv_context.ot, response, message_info);
 
 	LOG_HEXDUMP_INF(payload, payload_size, "Sent provisioning response:");
