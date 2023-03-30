@@ -25,4 +25,7 @@ enum light_command {
 #define GENERIC_URI_PATH "generic"
 #define GENERIC_PAYLOAD_SIZE 64
 
+#define SERVER_PANID 0xAAAA
+#define SERVERCLIENT_PANID 0xBBBB
+
 #endif
