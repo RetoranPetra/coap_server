@@ -14,11 +14,19 @@
 //L
 #include <zephyr/drivers/gpio.h>
 //L
+#include <math.h>
+/* 1000 nsec = 1 usec */
+#define MIN_PER 200000
+#define MAX_PER 100000000
+#define full_length_in_steps 3000
+#define pi 3.14159265
+//#define delta_phi = pi/2/100;
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 //L
-const struct device *r_pulse = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 //L
+int Flag = 0;
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -34,19 +42,25 @@ static void on_light_request(uint8_t command)
 	static uint8_t val;
 
 	switch (command) {
-	case THREAD_COAP_UTILS_LIGHT_CMD_ON:
+	case THREAD_DRIVE_MOTORS_BACKWARDS: //Code to move motors backwards
+		LOG_DBG("Motor Backwards Code...\n");
 		dk_set_led_on(LIGHT_LED);
 		val = 1;
+		Flag = 1;
 		break;
 
-	case THREAD_COAP_UTILS_LIGHT_CMD_OFF:
+	case THREAD_STOP_MOTORS: //Code to stop motors
+		LOG_DBG("Motor Stop Code...\n");
 		dk_set_led_off(LIGHT_LED);
 		val = 0;
+		Flag = 1;
 		break;
 
-	case THREAD_COAP_UTILS_LIGHT_CMD_TOGGLE:
+	case THREAD_DRIVE_MOTORS_FORWARD: //Code to move motors forwards
+		LOG_DBG("Motor Forwards Code...\n");
 		val = !val;
 		dk_set_led(LIGHT_LED, val);
+		Flag = 1;
 		break;
 
 	default:
@@ -137,6 +151,7 @@ static void on_generic_request(otChangedFlags flags, struct openthread_context *
 	LOG_INF("Generic Request event execution!");
 	dk_set_led(LIGHT_LED, val);
 	val = !val;
+
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = { .state_changed_cb =
@@ -146,30 +161,31 @@ void main(void)
 {
 	//Need to sleep at start for logs to display correctly.
 	k_msleep(1000);
+	uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
+	int ySteps = 0;
 	int ret;
-	//L
-	if (!device_is_ready(r_pulse)){
-		LOG_ERR("Transmission pulse not ready\r\n");
+	int dir = 1;
+
+	if (!device_is_ready(P0)) {
+		return;
 	}
-	ret = gpio_pin_configure(r_pulse, 3, GPIO_OUTPUT_INACTIVE);
+
+	ret = gpio_pin_configure(P0, 3, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) {
-		LOG_ERR("Pin configuration failed");
+		return;
 	}
-	LOG_DBG("GPIO pin configured\nCurrently at logic %d\n", gpio_pin_get(r_pulse, 3));
-	//L
-	LOG_DBG("Passed openthread_start in main!");
-	//gpio_pin_configure(r_pulse, 3, GPIO_OUTPUT_ACTIVE);
-	gpio_pin_set(r_pulse, 3, 1);
-	LOG_DBG("Changes to: %d\n", gpio_pin_get(r_pulse, 3));
-	//L
+
+	ret = gpio_pin_configure(P0, 4, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
 	LOG_INF("Start CoAP-server sample");
 
 	k_timer_init(&led_timer, on_led_timer_expiry, on_led_timer_stop);
 	k_timer_init(&provisioning_timer, on_provisioning_timer_expiry, NULL);
 
 	k_work_init(&provisioning_work, activate_provisioning);
-
-
 
 	ret = ot_coap_init(&deactivate_provisionig, &on_light_request, &on_generic_request);
 	if (ret) {
@@ -192,6 +208,34 @@ void main(void)
 	openthread_state_changed_cb_register(openthread_get_default_context(), &ot_state_chaged_cb);
 	openthread_start(openthread_get_default_context());
 
+	k_sleep(K_NSEC(4000U*1000U*1000U));
+
+	while (1) {
+		gpio_pin_set(P0, 3, 1);
+
+		k_sleep(K_NSEC(period/2U));
+
+		gpio_pin_set(P0, 3, 0);
+
+		k_sleep(K_NSEC(period/2U));
+
+		ySteps++;
+
+		if(Flag == 1){
+			dir = -dir;
+			Flag = 0;
+		}
+
+		if(dir == 1)
+			gpio_pin_set(P0, 4, 1);
+		if(dir == -1)
+			gpio_pin_set(P0, 4, 0);
+
+		if(period < MIN_PER)
+			period = MIN_PER;
+		if(period > MAX_PER)
+			period = MAX_PER;
+	}
 
 end:
 	return;
