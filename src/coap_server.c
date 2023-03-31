@@ -11,8 +11,14 @@
 #include <openthread/thread.h>
 
 #include "ot_coap_utils.h"
+//L
+#include <zephyr/drivers/gpio.h>
+//L
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
+//L
+const struct device *r_pulse = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+//L
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -127,7 +133,10 @@ static void on_thread_state_changed(otChangedFlags flags, struct openthread_cont
 
 static void on_generic_request(otChangedFlags flags, struct openthread_context *ot_context, void *user_data) {
 	//Something to deal with message would normally go here. However, message is just character string so it doesn't matter.
+	static uint8_t val;
 	LOG_INF("Generic Request event execution!");
+	dk_set_led(LIGHT_LED, val);
+	val = !val;
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = { .state_changed_cb =
@@ -137,15 +146,30 @@ void main(void)
 {
 	//Need to sleep at start for logs to display correctly.
 	k_msleep(1000);
-
 	int ret;
-
+	//L
+	if (!device_is_ready(r_pulse)){
+		LOG_ERR("Transmission pulse not ready\r\n");
+	}
+	ret = gpio_pin_configure(r_pulse, 3, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		LOG_ERR("Pin configuration failed");
+	}
+	LOG_DBG("GPIO pin configured\nCurrently at logic %d\n", gpio_pin_get(r_pulse, 3));
+	//L
+	LOG_DBG("Passed openthread_start in main!");
+	//gpio_pin_configure(r_pulse, 3, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_set(r_pulse, 3, 1);
+	LOG_DBG("Changes to: %d\n", gpio_pin_get(r_pulse, 3));
+	//L
 	LOG_INF("Start CoAP-server sample");
 
 	k_timer_init(&led_timer, on_led_timer_expiry, on_led_timer_stop);
 	k_timer_init(&provisioning_timer, on_provisioning_timer_expiry, NULL);
 
 	k_work_init(&provisioning_work, activate_provisioning);
+
+
 
 	ret = ot_coap_init(&deactivate_provisionig, &on_light_request, &on_generic_request);
 	if (ret) {
@@ -168,7 +192,6 @@ void main(void)
 	openthread_state_changed_cb_register(openthread_get_default_context(), &ot_state_chaged_cb);
 	openthread_start(openthread_get_default_context());
 
-	LOG_DBG("Passed openthread_start in main!");
 
 end:
 	return;
