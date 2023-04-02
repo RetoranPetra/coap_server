@@ -26,7 +26,8 @@ LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 //L
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 //L
-int Flag = 0;
+int position = 0; //Changed from Flag
+int fixed_position = 0; //Placeholder for position
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -43,24 +44,24 @@ static void on_light_request(uint8_t command)
 
 	switch (command) {
 	case THREAD_DRIVE_MOTORS_BACKWARDS: //Code to move motors backwards
-		LOG_DBG("Motor Backwards Code...\n");
+		LOG_DBG("Subtracted 5 from the motor position\nMotor position set to: %d\n", position);
 		dk_set_led_on(LIGHT_LED);
 		val = 1;
-		Flag = 10;
+		position -= 5; //Subtracts 5 from the motor's position
 		break;
 
 	case THREAD_STOP_MOTORS: //Code to stop motors
-		LOG_DBG("Motor Stop Code...\n");
+		LOG_DBG("Added 5 to the motor position\nMotor position set to: %d\n", position);
 		dk_set_led_off(LIGHT_LED);
 		val = 0;
-		Flag = 50;
+		position += 5; //Adds 5 to the motor's position
 		break;
 
 	case THREAD_DRIVE_MOTORS_FORWARD: //Code to move motors forwards
-		LOG_DBG("Motor Forwards Code...\n");
+		fixed_position = position;
+		LOG_DBG("Moving to position: %d\n", fixed_position);
 		val = !val;
 		dk_set_led(LIGHT_LED, val);
-		Flag = 90;
 		break;
 
 	default:
@@ -164,9 +165,10 @@ void main(void)
 	uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
 	int ySteps = 0;
 	int yTargetSteps = 0;
+	fixed_position = 0;
 	int ret;
 	int dir = 1;
-	Flag = 0;
+	position = 0;
 
 	if (!device_is_ready(P0)) {
 		return;
@@ -213,34 +215,37 @@ void main(void)
 	k_sleep(K_NSEC(4000U*1000U*1000U));
 
 	while (1) {
-		yTargetSteps = Flag*full_length_in_steps/100;
-
+		yTargetSteps = fixed_position*full_length_in_steps/100; //Only updates the target position when corresponding message received
+		//Doesn't work when position set once
 		if(yTargetSteps > ySteps){
 			dir = 1;
 			LOG_INF("Moving Forwards");
 		}
 		else if(yTargetSteps < ySteps){
-				LOG_INF("Moving Back");
-				dir = -1;}
-				else
-					while(ySteps == yTargetSteps) {yTargetSteps = Flag*full_length_in_steps/100; LOG_INF("Awaiting Command");}
-
-		gpio_pin_set(P0, 3, 1);
+			LOG_INF("Moving Back");
+			dir = -1;
+		}
+		else{
+			while(ySteps == yTargetSteps){ // Sets target steps when new position set
+				yTargetSteps = fixed_position*full_length_in_steps/100;
+				LOG_INF("Position reached!\nAwaiting Command");
+			}
+		}
+ 
+		gpio_pin_set(P0, 3, 1); //Sets step input
 
 		k_sleep(K_NSEC(period/2U));
 
-		gpio_pin_set(P0, 3, 0);
+		gpio_pin_set(P0, 3, 0); //Sets step input
 
 		k_sleep(K_NSEC(period/2U));
 
 		ySteps = ySteps+dir;
 
-		
-
 		if(dir == 1)
-			gpio_pin_set(P0, 4, 1);
+			gpio_pin_set(P0, 4, 1); //Sets driver input
 		if(dir == -1)
-			gpio_pin_set(P0, 4, 0);
+			gpio_pin_set(P0, 4, 0); //Sets driver input
 
 		if(period < MIN_PER)
 			period = MIN_PER;
