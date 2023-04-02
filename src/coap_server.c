@@ -46,21 +46,21 @@ static void on_light_request(uint8_t command)
 		LOG_DBG("Motor Backwards Code...\n");
 		dk_set_led_on(LIGHT_LED);
 		val = 1;
-		Flag = 1;
+		Flag = 10;
 		break;
 
 	case THREAD_STOP_MOTORS: //Code to stop motors
 		LOG_DBG("Motor Stop Code...\n");
 		dk_set_led_off(LIGHT_LED);
 		val = 0;
-		Flag = 1;
+		Flag = 50;
 		break;
 
 	case THREAD_DRIVE_MOTORS_FORWARD: //Code to move motors forwards
 		LOG_DBG("Motor Forwards Code...\n");
 		val = !val;
 		dk_set_led(LIGHT_LED, val);
-		Flag = 1;
+		Flag = 90;
 		break;
 
 	default:
@@ -163,8 +163,10 @@ void main(void)
 	k_msleep(1000);
 	uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
 	int ySteps = 0;
+	int yTargetSteps = 0;
 	int ret;
 	int dir = 1;
+	Flag = 0;
 
 	if (!device_is_ready(P0)) {
 		return;
@@ -211,6 +213,18 @@ void main(void)
 	k_sleep(K_NSEC(4000U*1000U*1000U));
 
 	while (1) {
+		yTargetSteps = Flag*full_length_in_steps/100;
+
+		if(yTargetSteps > ySteps){
+			dir = 1;
+			LOG_INF("Moving Forwards");
+		}
+		else if(yTargetSteps < ySteps){
+				LOG_INF("Moving Back");
+				dir = -1;}
+				else
+					while(ySteps == yTargetSteps) {yTargetSteps = Flag*full_length_in_steps/100; LOG_INF("Awaiting Command");}
+
 		gpio_pin_set(P0, 3, 1);
 
 		k_sleep(K_NSEC(period/2U));
@@ -219,12 +233,9 @@ void main(void)
 
 		k_sleep(K_NSEC(period/2U));
 
-		ySteps++;
+		ySteps = ySteps+dir;
 
-		if(Flag == 1){
-			dir = -dir;
-			Flag = 0;
-		}
+		
 
 		if(dir == 1)
 			gpio_pin_set(P0, 4, 1);
