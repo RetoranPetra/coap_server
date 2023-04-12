@@ -31,8 +31,8 @@ LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 //L
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 //L
-int position = 0; //Changed from Flag
-int fixed_position = 0; //Placeholder for position
+//int position = 0; //Changed from Flag
+float fixed_position = 0; //Placeholder for position
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -48,35 +48,11 @@ static void on_light_request(uint8_t command)
 	static uint8_t val;
 
 	switch (command) {
-	case THREAD_DRIVE_MOTORS_BACKWARDS: //Code to move motors backwards
-		if(position>=5){
-			position -= 5; //Subtracts 5 from the motor's position
-			LOG_DBG("Subtracted 5 from the motor position\nMotor position set to: %d\n", position);
-			dk_set_led_on(LIGHT_LED);
-			val = 1;
-			break;
-		}
-		else {
-			LOG_ERR("The motor position must be between 0 and 100\n");
-		}
 
 	case THREAD_STOP_MOTORS: //Code to stop motors
-		if(position <= 95){
-			position += 5; //Subtracts 5 from the motor's position
-			LOG_DBG("Added 5 to the motor position\nMotor position set to: %d\n", position);
-			dk_set_led_on(LIGHT_LED);
-			val = 1;
-			break;
-		}
-		else {
-			LOG_ERR("The motor position must be between 0 and 100\n");
-		}
-
-	case THREAD_DRIVE_MOTORS_FORWARD: //Code to move motors forwards
-		fixed_position = position;
-		LOG_DBG("Moving to position: %d\n", fixed_position);
-		val = !val;
+		LOG_DBG("Toggling LED\n");
 		dk_set_led(LIGHT_LED, val);
+		val = !val;
 		break;
 
 	default:
@@ -112,6 +88,7 @@ static void on_provisioning_timer_expiry(struct k_timer *timer_id)
 	ARG_UNUSED(timer_id);
 
 	deactivate_provisionig();
+	LOG_INF("Timer Expired. Provisioning deactivated!\n");
 }
 
 static void on_led_timer_expiry(struct k_timer *timer_id)
@@ -137,6 +114,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed)
 
 	if (buttons & DK_BTN4_MSK) {
 		k_work_submit(&provisioning_work);
+		LOG_INF("Provisioning request sent\n");
 	}
 }
 
@@ -187,14 +165,14 @@ void main(void)
 {
 	//Need to sleep at start for logs to display correctly.
 	k_msleep(1000);
-	uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
+	/*uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
 	int ySteps = 0;
 	int yTargetSteps = 0;
-	fixed_position = 0;
+	fixed_position = 0.0;
 	int ret;
 	int dir = 1;
-	position = 0;
-
+	*/
+	int ret;
 	if (!device_is_ready(P0)) {
 		return;
 	}
@@ -237,9 +215,10 @@ void main(void)
 	openthread_state_changed_cb_register(openthread_get_default_context(), &ot_state_chaged_cb);
 	openthread_start(openthread_get_default_context());
 
-	k_sleep(K_NSEC(4000U*1000U*1000U));
+	LOG_INF("Everything initialised correctly\n");
+	//k_sleep(K_NSEC(4000U*1000U*1000U));
 
-	while (1) {
+	/*while (1) {
 		yTargetSteps = fixed_position*full_length_in_steps/100; //Only updates the target position when corresponding message received
 		//Doesn't work when position set once
 		if(yTargetSteps > ySteps){
@@ -276,8 +255,9 @@ void main(void)
 			period = MIN_PER;
 		if(period > MAX_PER)
 			period = MAX_PER;
+		//k_msleep(1000); //Sleep so inifinite loop does not disturb threads
 	}
-
+	*/
 end:
 	return;
 }
