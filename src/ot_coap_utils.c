@@ -208,7 +208,7 @@ static void float_request_handler(void *context, otMessage *message,
 	ARG_UNUSED(message_info);
 
 	LOG_INF("Message received is:\n%s",myBuffer);
-	message_float = atof(myBuffer);
+	message_float = (float)atof(myBuffer);
 	LOG_DBG("Float message to 2dp is:\n%.2f", message_float);
 
 	srv_context.on_float_request(myBuffer);

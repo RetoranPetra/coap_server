@@ -153,7 +153,7 @@ static void on_float_request(otChangedFlags flags, struct openthread_context *ot
 	dk_set_led(LIGHT_LED, val);
 	//Change position and fixed position here to floats and set them accordingly
 	fixed_position = get_float();
-	LOG_DBG("On Float Request float to 2dp: %f\n", fixed_position);
+	LOG_DBG("On Float Request float to 2dp: %.2f\n", fixed_position);
 	val = !val;
 
 }
