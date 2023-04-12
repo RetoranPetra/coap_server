@@ -13,6 +13,7 @@
 #include "ot_coap_utils.h"
 //L
 #include <zephyr/drivers/gpio.h>
+#include <stdlib.h> //For string to float conversion
 //L
 #include <math.h>
 /* 1000 nsec = 1 usec */
@@ -21,6 +22,10 @@
 #define full_length_in_steps 3000
 #define pi 3.14159265
 //#define delta_phi = pi/2/100;
+
+/*Once the client and server are paired. Buttons 1 and 2 on the client are used to set the desired position.
+Button 3 is then pressed to move the motors to that specified position.
+The setting of the position is shown in the log*/
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 //L
@@ -44,18 +49,28 @@ static void on_light_request(uint8_t command)
 
 	switch (command) {
 	case THREAD_DRIVE_MOTORS_BACKWARDS: //Code to move motors backwards
-		LOG_DBG("Subtracted 5 from the motor position\nMotor position set to: %d\n", position);
-		dk_set_led_on(LIGHT_LED);
-		val = 1;
-		position -= 5; //Subtracts 5 from the motor's position
-		break;
+		if(position>=5){
+			position -= 5; //Subtracts 5 from the motor's position
+			LOG_DBG("Subtracted 5 from the motor position\nMotor position set to: %d\n", position);
+			dk_set_led_on(LIGHT_LED);
+			val = 1;
+			break;
+		}
+		else {
+			LOG_ERR("The motor position must be between 0 and 100\n");
+		}
 
 	case THREAD_STOP_MOTORS: //Code to stop motors
-		LOG_DBG("Added 5 to the motor position\nMotor position set to: %d\n", position);
-		dk_set_led_off(LIGHT_LED);
-		val = 0;
-		position += 5; //Adds 5 to the motor's position
-		break;
+		if(position <= 95){
+			position += 5; //Subtracts 5 from the motor's position
+			LOG_DBG("Added 5 to the motor position\nMotor position set to: %d\n", position);
+			dk_set_led_on(LIGHT_LED);
+			val = 1;
+			break;
+		}
+		else {
+			LOG_ERR("The motor position must be between 0 and 100\n");
+		}
 
 	case THREAD_DRIVE_MOTORS_FORWARD: //Code to move motors forwards
 		fixed_position = position;
@@ -152,6 +167,16 @@ static void on_generic_request(otChangedFlags flags, struct openthread_context *
 	LOG_INF("Generic Request event execution!");
 	dk_set_led(LIGHT_LED, val);
 	val = !val;
+}
+
+static void on_float_request(otChangedFlags flags, struct openthread_context *ot_context, void *user_data) {
+	static uint8_t val;
+	LOG_INF("Float Request event execution!");
+	dk_set_led(LIGHT_LED, val);
+	//Change position and fixed position here to floats and set them accordingly
+	fixed_position = get_float();
+	LOG_DBG("On Float Request float to 2dp: %f\n", fixed_position);
+	val = !val;
 
 }
 
@@ -191,7 +216,7 @@ void main(void)
 
 	k_work_init(&provisioning_work, activate_provisioning);
 
-	ret = ot_coap_init(&deactivate_provisionig, &on_light_request, &on_generic_request);
+	ret = ot_coap_init(&deactivate_provisionig, &on_light_request, &on_generic_request, &on_float_request);
 	if (ret) {
 		LOG_ERR("Could not initialize OpenThread CoAP");
 		goto end;

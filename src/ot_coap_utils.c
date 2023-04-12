@@ -14,8 +14,11 @@
 #include <openthread/thread.h>
 
 #include "ot_coap_utils.h"
+#include <stdlib.h> //For string to float conversion
 
 LOG_MODULE_REGISTER(ot_coap_utils, CONFIG_OT_COAP_UTILS_LOG_LEVEL);
+
+float message_float;
 
 struct server_context {
 	struct otInstance *ot;
@@ -23,6 +26,7 @@ struct server_context {
 	light_request_callback_t on_light_request;
 	provisioning_request_callback_t on_provisioning_request;
 	generic_request_callback_t on_generic_request;
+	float_request_callback_t on_float_request;
 };
 
 static struct server_context srv_context = {
@@ -31,6 +35,7 @@ static struct server_context srv_context = {
 	.on_light_request = NULL,
 	.on_provisioning_request = NULL,
 	.on_generic_request = NULL,
+	.on_float_request = NULL,
 };
 
 /**@brief Definition of CoAP resources for provisioning. */
@@ -51,6 +56,13 @@ static otCoapResource light_resource = {
 
 static otCoapResource generic_resource = {
 	.mUriPath = GENERIC_URI_PATH,
+	.mHandler = NULL,
+	.mContext = NULL,
+	.mNext = NULL
+};
+
+static otCoapResource float_resource = {
+	.mUriPath = FLOAT_URI_PATH,
 	.mHandler = NULL,
 	.mContext = NULL,
 	.mNext = NULL
@@ -183,6 +195,28 @@ static void generic_request_handler(void *context, otMessage *message,
 	srv_context.on_generic_request(myBuffer);
 }
 //m/
+//Float message handler
+static void float_request_handler(void *context, otMessage *message,
+				 const otMessageInfo *message_info)
+{
+	//Need to do this with malloc if it's going to be accessed outside this function using srv_context.
+	char myBuffer[FLOAT_PAYLOAD_SIZE] = {};
+
+	otMessageRead(message,otMessageGetOffset(message),&myBuffer, FLOAT_PAYLOAD_SIZE);
+
+	ARG_UNUSED(context);
+	ARG_UNUSED(message_info);
+
+	LOG_INF("Message received is:\n%s",myBuffer);
+	message_float = atof(myBuffer);
+	LOG_DBG("Float message to 2dp is:\n%.2f", message_float);
+
+	srv_context.on_float_request(myBuffer);
+}
+
+float get_float(void){
+	return message_float;
+}
 
 static void coap_default_handler(void *context, otMessage *message,
 				 const otMessageInfo *message_info)
@@ -211,7 +245,7 @@ bool ot_coap_is_provisioning_active(void)
 }
 
 int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
-		 light_request_callback_t on_light_request, generic_request_callback_t on_generic_request)
+		 light_request_callback_t on_light_request, generic_request_callback_t on_generic_request, float_request_callback_t on_float_request)
 {
 	otError error;
 
@@ -220,7 +254,10 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
 	srv_context.on_light_request = on_light_request;
 	//m
 	srv_context.on_generic_request = on_generic_request;
-	//m/
+	//L
+	srv_context.on_float_request = on_float_request;
+	//L
+
 
 	srv_context.ot = openthread_get_default_instance();
 	if (!srv_context.ot) {
@@ -238,14 +275,20 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
 	//m
 	generic_resource.mContext = srv_context.ot;
 	generic_resource.mHandler = generic_request_handler;
-	//m/
+	//L
+	float_resource.mContext = srv_context.ot;
+	float_resource.mHandler = float_request_handler;
+	//L
 
 	otCoapSetDefaultHandler(srv_context.ot, coap_default_handler, NULL);
 	otCoapAddResource(srv_context.ot, &light_resource);
 	otCoapAddResource(srv_context.ot, &provisioning_resource);
 	//m
 	otCoapAddResource(srv_context.ot, &generic_resource);
-	//m/
+	//L
+	otCoapAddResource(srv_context.ot, &float_resource);
+	//L
+
 
 	error = otCoapStart(srv_context.ot, COAP_PORT);
 	if (error != OT_ERROR_NONE) {
