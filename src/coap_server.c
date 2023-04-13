@@ -11,6 +11,7 @@
 #include <openthread/thread.h>
 
 #include "ot_coap_utils.h"
+#include "coap_client_utils.h"
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
@@ -182,6 +183,7 @@ void main(void)
 
 	LOG_DBG("Passed openthread_start in main!");
 
+	coap_client_utils_init();
 end:
 	return;
 }
