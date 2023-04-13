@@ -216,48 +216,8 @@ void main(void)
 	openthread_start(openthread_get_default_context());
 
 	LOG_INF("Everything initialised correctly\n");
-	//k_sleep(K_NSEC(4000U*1000U*1000U));
+	otChannelManagerSetAutoChannelSelectionEnabled(openthread_get_default_instance(), false);
 
-	/*while (1) {
-		yTargetSteps = fixed_position*full_length_in_steps/100; //Only updates the target position when corresponding message received
-		//Doesn't work when position set once
-		if(yTargetSteps > ySteps){
-			dir = 1;
-			LOG_INF("Moving Forwards");
-		}
-		else if(yTargetSteps < ySteps){
-			LOG_INF("Moving Back");
-			dir = -1;
-		}
-		else{
-			while(ySteps == yTargetSteps){ // Sets target steps when new position set
-				yTargetSteps = fixed_position*full_length_in_steps/100;
-				LOG_INF("Position reached!\nAwaiting Command");
-			}
-		}
- 
-		gpio_pin_set(P0, 3, 1); //Sets step input
-
-		k_sleep(K_NSEC(period/2U));
-
-		gpio_pin_set(P0, 3, 0); //Sets step input
-
-		k_sleep(K_NSEC(period/2U));
-
-		ySteps = ySteps+dir;
-
-		if(dir == 1)
-			gpio_pin_set(P0, 4, 1); //Sets driver input
-		if(dir == -1)
-			gpio_pin_set(P0, 4, 0); //Sets driver input
-
-		if(period < MIN_PER)
-			period = MIN_PER;
-		if(period > MAX_PER)
-			period = MAX_PER;
-		//k_msleep(1000); //Sleep so inifinite loop does not disturb threads
-	}
-	*/
 end:
 	return;
 }
