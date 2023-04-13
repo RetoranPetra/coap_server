@@ -102,6 +102,17 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed)
 	if (buttons & DK_BTN4_MSK) {
 		k_work_submit(&provisioning_work);
 	}
+	if (buttons & DK_BTN3_MSK) {
+		//Should toggle through server selected.
+		serverScroll();
+	}
+	if (buttons & DK_BTN2_MSK) {
+		//Should send a provisioning request.
+		coap_client_send_provisioning_request();
+	}
+	if (buttons & DK_BTN1_MSK) {
+		coap_client_toggle_one_light();
+	}
 }
 
 static void on_thread_state_changed(otChangedFlags flags, struct openthread_context *ot_context,
@@ -125,7 +136,8 @@ static void on_thread_state_changed(otChangedFlags flags, struct openthread_cont
 	}
 }
 
-static void on_generic_request(otChangedFlags flags, struct openthread_context *ot_context, void *user_data) {
+static void on_generic_request(//otChangedFlags flags, struct openthread_context *ot_context, void *user_data
+char* msg) {
 	//Something to deal with message would normally go here. However, message is just character string so it doesn't matter.
 	LOG_INF("Generic Request event execution!");
 }

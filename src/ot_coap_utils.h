@@ -27,4 +27,14 @@ void ot_coap_deactivate_provisioning(void);
 
 bool ot_coap_is_provisioning_active(void);
 
+void coap_client_genericSend(char* msg);
+
+void serverScroll(void);
+
+void coap_client_toggle_one_light(void);
+
+void coap_client_send_provisioning_request(void);
+
+
+
 #endif
