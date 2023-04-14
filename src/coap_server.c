@@ -9,6 +9,10 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/openthread.h>
 #include <openthread/thread.h>
+// Channel management
+#include <openthread/channel_manager.h>
+#include <openthread/channel_monitor.h>
+#include <nrf_802154.h>
 
 #include "ot_coap_utils.h"
 #include "coap_client_utils.h"
@@ -184,6 +188,26 @@ void main(void)
 	LOG_DBG("Passed openthread_start in main!");
 
 	coap_client_utils_init();
+
+
+  // See https://openthread.io/reference/group/api-channel-manager
+  otInstance *inst = openthread_get_default_instance();
+  otChannelManagerSetAutoChannelSelectionEnabled(inst, false);
+
+  // Seems to not work.
+
+  otChannelManagerSetFavoredChannels(inst, 5); // Doesn't set channel, just
+  // sets a preferred one so auto selector chooses it more often.
+  otChannelManagerSetDelay(inst, 1);
+  otChannelManagerRequestChannelSelect(inst, 7); // Request channel change to
+  // 7, doesn't work it seems.
+
+  LOG_DBG("Favoured channel: %d", otChannelManagerGetFavoredChannels(inst));
+  while (1) {
+    k_msleep(1000);
+    LOG_DBG("Channel is: %d", nrf_802154_channel_get());
+  }
+
 end:
 	return;
 }

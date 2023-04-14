@@ -15,4 +15,7 @@ FILE(GLOB app_sources src/*.c)
 target_sources(app PRIVATE ${app_sources})
 
 target_include_directories(app PRIVATE interface)
+
+# Caleb's secret nvim sauce
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # NORDIC SDK APP END
