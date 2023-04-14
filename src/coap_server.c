@@ -33,6 +33,7 @@ const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 //L
 //int position = 0; //Changed from Flag
 float fixed_position = 0; //Placeholder for position
+uint8_t led_toggle = 0;	//To toggle the led GPIO when message received
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -148,13 +149,11 @@ static void on_generic_request(otChangedFlags flags, struct openthread_context *
 }
 
 static void on_float_request(otChangedFlags flags, struct openthread_context *ot_context, void *user_data) {
-	static uint8_t val;
+	dk_set_led(LIGHT_LED, led_toggle); //Toggles LED and pin P0.16	
 	LOG_INF("Float Request event execution!");
-	dk_set_led(LIGHT_LED, val);
 	//Change position and fixed position here to floats and set them accordingly
 	fixed_position = get_float();
-	LOG_DBG("On Float Request float to 2dp: %.2f\n", fixed_position);
-	val = !val;
+	LOG_DBG("GPIO Toggled!\nOn Float Request float to 2dp: %.2f\n", fixed_position);
 
 }
 
