@@ -23,3 +23,4 @@ source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
 module = IMU
 module-str = IMU 20600
 source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+

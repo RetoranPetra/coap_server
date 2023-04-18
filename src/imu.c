@@ -2,7 +2,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/i2c.h>
 
-#include "ICM20600.h"
+#include "imu.h"
 
 /***************************************************************
     ICM20600 I2C Register
@@ -170,33 +170,33 @@ uint16_t _acc_scale, _gyro_scale;
 
 uint16_t ICM20600_startup(void)
 {
-    printk("Starting...\n");//I2C_SPEED_GET(cfg)
+    LOG_DBG("Starting...\n");//I2C_SPEED_GET(cfg)
     if (device_is_ready(dev_i2c.bus)) {
-	printk("I2C bus %X is ready!\n\r",(uint32_t)(dev_i2c.bus->name));
+	LOG_DBG("I2C bus %X is ready!\n\r",(uint32_t)(dev_i2c.bus->name));
     }
     
 
     // Get the Device ID
 	ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_WHO_AM_I,Buffer);
-    printk("Stage: Config\n"); 
+    LOG_DBG("Stage: Config\n"); 
 	ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_CONFIG,0x00);
 
 	// disable fifo: 1K byte FIFO buffer enables the applications processor to read the data in bursts
 
-    printk("Stage: disabling fifo\n"); 
+    LOG_DBG("Stage: disabling fifo\n"); 
 	ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_FIFO_EN,0x00);
 	
     //Set Power 
     uint8_t data_pwr1;
     uint8_t data_pwr2 = 0x00;
     uint8_t data_gyro_lp;
-    printk("Stage: Setting Power\n"); 
+    LOG_DBG("Stage: Setting Power\n"); 
     ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_PWR_MGMT_1,Buffer); // _addr, ICM20600_PWR_MGMT_1, Buffer
-    printk("Power Management 1: %X\n",Buffer[0]);
+    LOG_DBG("Power Management 1: %X\n",Buffer[0]);
     data_pwr1 = Buffer[0];
     data_pwr1 &= 0x8f;                  // 0b10001111
     ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_GYRO_LP_MODE_CFG,Buffer);
-    printk("Power Management 2: %X\n",Buffer[0]);
+    LOG_DBG("Power Management 2: %X\n",Buffer[0]);
     data_gyro_lp = Buffer[0];
     // When set to ‘1’ low-power gyroscope mode is enabled. Default setting is 0
     data_gyro_lp &= 0x7f;               // 0b01111111
@@ -204,64 +204,64 @@ uint16_t ICM20600_startup(void)
     data_gyro_lp |= 0x80;        // set 0b01000000
 
 
-    printk("Gyro Low Power: %X\n",data_gyro_lp);
-    printk("Stage: Setting Power mode 1\n");
+    LOG_DBG("Gyro Low Power: %X\n",data_gyro_lp);
+    LOG_DBG("Stage: Setting Power mode 1\n");
     ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_PWR_MGMT_1,data_pwr1);
-    printk("Stage: Setting Power mode 2\n");
+    LOG_DBG("Stage: Setting Power mode 2\n");
     ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_PWR_MGMT_2,data_pwr2);
-    printk("Stage: Setting low power mode for Gyro \n");
+    LOG_DBG("Stage: Setting low power mode for Gyro \n");
     ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_GYRO_LP_MODE_CFG,data_gyro_lp);
     
     // Gyro Config
-    printk("Stage: reading Gyro Config \n");
+    LOG_DBG("Stage: reading Gyro Config \n");
     uint8_t data = 0;
     ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_GYRO_CONFIG,Buffer);
-    printk("Gyro Config: %X\n",Buffer[0]);
+    LOG_DBG("Gyro Config: %X\n",Buffer[0]);
     data = Buffer[0];
     data &= 0xe7; // 0b11100111
     data |= 0x18;   // 0bxxx11xxx
     _gyro_scale = 4000;
 
 
-    printk("Stage: Setting Gyro Config \n");
+    LOG_DBG("Stage: Setting Gyro Config \n");
     ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_GYRO_CONFIG,data);
     data = 0;
      ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_CONFIG,Buffer);
-     printk("Gyro Config: %X\n",Buffer[0]);
+     LOG_DBG("Gyro Config: %X\n",Buffer[0]);
     data = Buffer[0];
     data &= 0xf8;
     data |= 0x01;
-    printk("Stage: Setting I2c device config \n");
+    LOG_DBG("Stage: Setting I2c device config \n");
     ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_CONFIG,data);
     data = 0;
     ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_GYRO_LP_MODE_CFG,Buffer);
-    printk("Gyro Config lp mode cfg(maybe 0): %X\n",Buffer[0]);
+    LOG_DBG("Gyro Config lp mode cfg(maybe 0): %X\n",Buffer[0]);
     data = Buffer[0];
     data &= 0x8f;  
     data |= 0x00;         // 0b10001111
-    printk("Stage: Setting setting i2c gyro config \n");
+    LOG_DBG("Stage: Setting setting i2c gyro config \n");
     ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_GYRO_CONFIG,data);
     // accel config
     data = 0;
-    printk("Stage: Setting i2c accel config \n");
+    LOG_DBG("Stage: Setting i2c accel config \n");
     ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_CONFIG,Buffer);
-    printk("Gyro Accleration Config: %X\n",Buffer[0]);
+    LOG_DBG("Gyro Accleration Config: %X\n",Buffer[0]);
     data = Buffer[0];
     data &= 0xe7;
     data |= 0x18;   // 0bxxx11xxx
     _acc_scale = 32000;
-    printk("Gyro Accleration Config set point: %X\n",data);
+    LOG_DBG("Gyro Accleration Config set point: %X\n",data);
     ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_ACCEL_CONFIG,data);
     data = 0;
     ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_CONFIG2,Buffer);
-    printk("Gyro Accleration Config: %X\n",Buffer[0]);
+    LOG_DBG("Gyro Accleration Config: %X\n",Buffer[0]);
     data = Buffer[0];
     data &= 0xf0;  // 0b11110000
     data |= 0x07;
     ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_ACCEL_CONFIG2, data);
     data = 0;
     ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_CONFIG2,Buffer);
-    printk("Gyro Accleration Config 2: %X\n",Buffer[0]);
+    LOG_DBG("Gyro Accleration Config 2: %X\n",Buffer[0]);
     data = Buffer[0];
     data &= 0xcf; // & 0b11001111
     data |= 0x00;
@@ -317,4 +317,17 @@ int16_t getTemperature(void) {
     ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_TEMP_OUT_H,Buffer);
     rawdata = (((uint32_t)Buffer[0]) << 8) + Buffer[1];
     return (int16_t)(rawdata / 327 + 25);
+}
+
+void imuTestLoop(void) {
+    while(true)
+    {
+        LOG_DBG("Accl_x: %d mm/s\n",getRawAccelerationX());
+        LOG_DBG("Accl_y: %d mm/s\n",getRawAccelerationY());
+        LOG_DBG("Accl_z: %d mm/s\n",getRawAccelerationZ());
+        LOG_DBG("Gyro_x: %d dps\n",getRawGyroscopeX());
+        LOG_DBG("Gyro_y: %d dps\n",getRawGyroscopeY());
+        LOG_DBG("Gyro_z: %d dps\n",getRawGyroscopeZ());
+        k_msleep(500);
+    }
 }

@@ -18,7 +18,7 @@
 #include "coap_client_utils.h"
 
 // Control modules
-#include "ICM20600.h"
+#include "imu.h"
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
@@ -212,16 +212,7 @@ void main(void)
   }
   */
   ICM20600_startup();
-  while(true) {
-        printk("Accl_x: %d mm/s\n",getRawAccelerationX());
-        printk("Accl_y: %d mm/s\n",getRawAccelerationY());
-        printk("Accl_z: %d mm/s\n",getRawAccelerationZ());
-        printk("Gyro_x: %d dps\n",getRawGyroscopeX());
-        printk("Gyro_y: %d dps\n",getRawGyroscopeY());
-        printk("Gyro_z: %d dps\n",getRawGyroscopeZ());
-        k_msleep(500);
-  }
-
+  imuTestLoop();
 end:
 	return;
 }
