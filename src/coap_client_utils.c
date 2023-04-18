@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include <zephyr/kernel.h>
 #include <coap_server_client_interface.h>
 #include <net/coap_utils.h>
 #include <zephyr/logging/log.h>
@@ -37,7 +36,7 @@ static struct k_work floatSend_work;
 //Must point to something of size GENERIC_PAYLOAD_SIZE
 static char messagePointer[GENERIC_PAYLOAD_SIZE]= {};
 
-static double floatPointer[FLOAT_PAYLOAD_SIZE] = {};
+static double floatPointer[1] = {};
 
 mtd_mode_toggle_cb_t on_mtd_mode_toggle;
 
@@ -275,10 +274,10 @@ static void genericSend(struct k_work *item) {
 }
 static void floatSend(struct k_work *item) {
   ARG_UNUSED(item);
-	LOG_DBG("Generic send to %s",unique_local_addr_str[serverSelector]);
+	LOG_DBG("Float send to %s",unique_local_addr_str[serverSelector]);
 	if (coap_send_request(COAP_METHOD_PUT,
 			  (const struct sockaddr *)&unique_local_addr[serverSelector],
-			  float_option, (char*)floatPointer, FLOAT_PAYLOAD_SIZE*sizeof(double), NULL) >= 0) {
+			  float_option, (char*)floatPointer, sizeof(double), NULL) >= 0) {
 		
 		LOG_DBG("Float message send success!\n%.3f",*floatPointer);
 	}
@@ -349,7 +348,7 @@ void coap_client_genericSend(char* msg) {
 }
 
 void coap_client_floatSend(double num) {
-  memcpy(floatPointer, &num, FLOAT_PAYLOAD_SIZE*sizeof(double));
+  memcpy(floatPointer, &num,sizeof(double));
   submit_work_if_connected(&floatSend_work);
 }
 

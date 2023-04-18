@@ -166,8 +166,7 @@ int ret;
 int8_t Buffer[16] = {0};
 uint16_t _acc_scale, _gyro_scale;
 
-
-uint16_t ICM20600_startup(void)
+void ICM20600_startup(void)
 {
     LOG_DBG("Starting...\n");//I2C_SPEED_GET(cfg)
     if (device_is_ready(dev_i2c.bus)) {
@@ -265,7 +264,6 @@ uint16_t ICM20600_startup(void)
     data &= 0xcf; // & 0b11001111
     data |= 0x00;
     ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_ACCEL_CONFIG2,data);
-    return _acc_scale, _gyro_scale;
 }
 
 int32_t getRawAccelerationX(void) {

@@ -202,16 +202,16 @@ static void float_request_handler(void *context, otMessage *message,
 				 const otMessageInfo *message_info)
 {
 	//Need to do this with malloc if it's going to be accessed outside this function using srv_context.
-	double myBuffer[FLOAT_PAYLOAD_SIZE] = {};
+	double myBuffer = 0.0;
 
 	//otMessageLength could be used in place of generic payload size.
 
-	otMessageRead(message,otMessageGetOffset(message),&myBuffer, FLOAT_PAYLOAD_SIZE*sizeof(double));
+	otMessageRead(message,otMessageGetOffset(message),&myBuffer, sizeof(double));
 
 	ARG_UNUSED(context);
 	ARG_UNUSED(message_info);
 
-	LOG_INF("Message received is:\n%f",*myBuffer);
+	LOG_INF("Message received is:\n%f",myBuffer);
 
 	srv_context.on_float_request(myBuffer);
 }

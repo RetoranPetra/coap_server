@@ -1,7 +1,7 @@
 #ifndef __IMU_H__
 #define __IMU_H__
 #include <zephyr/kernel.h>
-uint16_t ICM20600_startup(void);
+void ICM20600_startup(void);
 int32_t getRawAccelerationX(void);
 int32_t getRawAccelerationY(void);
 int32_t getRawAccelerationZ(void);

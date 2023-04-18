@@ -151,8 +151,8 @@ char* msg) {
 	LOG_INF("Generic Request event execution!");
 }
 
-static void on_float_request(double* num) {
-  LOG_INF("Number is: %f",*num);
+static void on_float_request(double num) {
+  LOG_INF("Number is: %f",num);
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = { .state_changed_cb =

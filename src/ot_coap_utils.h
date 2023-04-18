@@ -15,7 +15,7 @@ typedef void (*light_request_callback_t)(uint8_t cmd);
 typedef void (*provisioning_request_callback_t)();
 //m
 typedef void (*generic_request_callback_t)(char*stringStart);
-typedef void (*float_request_callback_t)(double*floatStart);
+typedef void (*float_request_callback_t)(double floatNum);
 //m/
 
 int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
