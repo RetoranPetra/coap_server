@@ -19,3 +19,7 @@ source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
 module = COAP_CLIENT_UTILS
 module-str = CoAP client utilities
 source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+module = IMU
+module-str = IMU 20600
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"

@@ -13,7 +13,6 @@ project(openthread_coap_server)
 FILE(GLOB app_sources src/*.c)
 # NORDIC SDK APP START
 target_sources(app PRIVATE ${app_sources})
-target_sources(app PRIVATE src/ICM20600.h)
 
 target_include_directories(app PRIVATE interface)
 

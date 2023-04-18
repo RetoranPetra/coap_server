@@ -213,13 +213,13 @@ void main(void)
   */
   ICM20600_startup();
   while(true) {
-    LOG_DBG("Accl_x: %d mm/s\n",getRawAccelerationX(_acc_scale));
-    LOG_DBG("Accl_y: %d mm/s\n",getRawAccelerationY(_acc_scale));
-    LOG_DBG("Accl_z: %d mm/s\n",getRawAccelerationZ(_acc_scale));
-    LOG_DBG("Gyro_x: %d dps\n",getRawGyroscopeX(_gyro_scale));
-    LOG_DBG("Gyro_y: %d dps\n",getRawGyroscopeY(_gyro_scale));
-    LOG_DBG("Gyro_z: %d dps\n",getRawGyroscopeZ(_gyro_scale));
-    k_msleep(500);
+        printk("Accl_x: %d mm/s\n",getRawAccelerationX());
+        printk("Accl_y: %d mm/s\n",getRawAccelerationY());
+        printk("Accl_z: %d mm/s\n",getRawAccelerationZ());
+        printk("Gyro_x: %d dps\n",getRawGyroscopeX());
+        printk("Gyro_y: %d dps\n",getRawGyroscopeY());
+        printk("Gyro_z: %d dps\n",getRawGyroscopeZ());
+        k_msleep(500);
   }
 
 end:
