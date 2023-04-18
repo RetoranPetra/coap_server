@@ -17,6 +17,9 @@
 #include "ot_coap_utils.h"
 #include "coap_client_utils.h"
 
+// Control modules
+#include "ICM20600.h"
+
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
 #define OT_CONNECTION_LED DK_LED1
@@ -196,16 +199,27 @@ void main(void)
 
   // Seems to not work.
 
-  otChannelManagerSetFavoredChannels(inst, 5); // Doesn't set channel, just
+  //otChannelManagerSetFavoredChannels(inst, 5); // Doesn't set channel, just
   // sets a preferred one so auto selector chooses it more often.
-  otChannelManagerSetDelay(inst, 1);
-  otChannelManagerRequestChannelSelect(inst, 7); // Request channel change to
+  //otChannelManagerSetDelay(inst, 1);
+  //otChannelManagerRequestChannelSelect(inst, 7); // Request channel change to
   // 7, doesn't work it seems.
-
+  /*
   LOG_DBG("Favoured channel: %d", otChannelManagerGetFavoredChannels(inst));
   while (1) {
     k_msleep(1000);
     LOG_DBG("Channel is: %d", nrf_802154_channel_get());
+  }
+  */
+  ICM20600_startup();
+  while(true) {
+    LOG_DBG("Accl_x: %d mm/s\n",getRawAccelerationX(_acc_scale));
+    LOG_DBG("Accl_y: %d mm/s\n",getRawAccelerationY(_acc_scale));
+    LOG_DBG("Accl_z: %d mm/s\n",getRawAccelerationZ(_acc_scale));
+    LOG_DBG("Gyro_x: %d dps\n",getRawGyroscopeX(_gyro_scale));
+    LOG_DBG("Gyro_y: %d dps\n",getRawGyroscopeY(_gyro_scale));
+    LOG_DBG("Gyro_z: %d dps\n",getRawGyroscopeZ(_gyro_scale));
+    k_msleep(500);
   }
 
 end:
