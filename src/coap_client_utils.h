@@ -12,6 +12,7 @@
 
 #ifndef __COAP_CLIENT_UTILS_H__
 #define __COAP_CLIENT_UTILS_H__
+#include <zephyr/kernel.h>
 
 /** @brief Type indicates function called when OpenThread connection
  *         is established.
@@ -64,6 +65,7 @@ void coap_client_toggle_minimal_sleepy_end_device(void);
 
 
 void coap_client_genericSend(char* msg);
+void coap_client_floatSend(double num);
 
 void serverScroll(void);
 

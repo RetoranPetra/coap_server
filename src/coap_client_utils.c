@@ -32,9 +32,12 @@ static struct k_work on_connect_work;
 static struct k_work on_disconnect_work;
 
 static struct k_work genericSend_work;
+static struct k_work floatSend_work;
 
 //Must point to something of size GENERIC_PAYLOAD_SIZE
 static char messagePointer[GENERIC_PAYLOAD_SIZE]= {};
+
+static double floatPointer[FLOAT_PAYLOAD_SIZE] = {};
 
 mtd_mode_toggle_cb_t on_mtd_mode_toggle;
 
@@ -43,6 +46,7 @@ static const char *const light_option[] = { LIGHT_URI_PATH, NULL };
 static const char *const provisioning_option[] = { PROVISIONING_URI_PATH,
 						   NULL };
 static const char *const generic_option[] = { GENERIC_URI_PATH, NULL};
+static const char *const float_option[] = {FLOAT_URI_PATH, NULL};
 
 /* Thread multicast mesh local address */
 static struct sockaddr_in6 multicast_local_addr = {
@@ -269,6 +273,19 @@ static void genericSend(struct k_work *item) {
 		LOG_DBG("Generic message send fail.\n%s",messagePointer);
 	}
 }
+static void floatSend(struct k_work *item) {
+  ARG_UNUSED(item);
+	LOG_DBG("Generic send to %s",unique_local_addr_str[serverSelector]);
+	if (coap_send_request(COAP_METHOD_PUT,
+			  (const struct sockaddr *)&unique_local_addr[serverSelector],
+			  float_option, (char*)floatPointer, FLOAT_PAYLOAD_SIZE*sizeof(double), NULL) >= 0) {
+		
+		LOG_DBG("Float message send success!\n%.3f",*floatPointer);
+	}
+	else {
+		LOG_DBG("Float message send fail.\n%.3f",*floatPointer);
+	}
+}
 //m/
 
 static void submit_work_if_connected(struct k_work *work)
@@ -298,6 +315,7 @@ void coap_client_utils_init(/*
 	k_work_init(&provisioning_work, send_provisioning_request);
 
 	k_work_init(&genericSend_work,genericSend);
+  k_work_init(&floatSend_work, floatSend);
 
 	//openthread_state_changed_cb_register(openthread_get_default_context(), &ot_state_chaged_cb);
 	//openthread_start(openthread_get_default_context());
@@ -328,6 +346,11 @@ void coap_client_send_provisioning_request(void)
 void coap_client_genericSend(char* msg) {
 	memcpy(messagePointer,msg,GENERIC_PAYLOAD_SIZE);
 	submit_work_if_connected(&genericSend_work);
+}
+
+void coap_client_floatSend(double num) {
+  memcpy(floatPointer, &num, FLOAT_PAYLOAD_SIZE*sizeof(double));
+  submit_work_if_connected(&floatSend_work);
 }
 
 void coap_client_toggle_minimal_sleepy_end_device(void)

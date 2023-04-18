@@ -25,6 +25,9 @@ enum light_command {
 #define GENERIC_URI_PATH "generic"
 #define GENERIC_PAYLOAD_SIZE 64
 
+#define FLOAT_URI_PATH "float"
+#define FLOAT_PAYLOAD_SIZE 1
+
 #define SERVERS 3
 #define CLIENTS 1
 

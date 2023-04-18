@@ -119,7 +119,8 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed)
 		coap_client_send_provisioning_request();
 	}
 	if (buttons & DK_BTN1_MSK) {
-		coap_client_toggle_one_light();
+		//coap_client_toggle_one_light();
+    coap_client_floatSend(10.768);
 	}
 }
 
@@ -150,6 +151,10 @@ char* msg) {
 	LOG_INF("Generic Request event execution!");
 }
 
+static void on_float_request(double* num) {
+  LOG_INF("Number is: %f",*num);
+}
+
 static struct openthread_state_changed_cb ot_state_chaged_cb = { .state_changed_cb =
 									 on_thread_state_changed };
 
@@ -167,7 +172,7 @@ void main(void)
 
 	k_work_init(&provisioning_work, activate_provisioning);
 
-	ret = ot_coap_init(&deactivate_provisionig, &on_light_request, &on_generic_request);
+	ret = ot_coap_init(&deactivate_provisionig, &on_light_request, &on_generic_request, &on_float_request);
 	if (ret) {
 		LOG_ERR("Could not initialize OpenThread CoAP");
 		goto end;
@@ -211,8 +216,10 @@ void main(void)
     LOG_DBG("Channel is: %d", nrf_802154_channel_get());
   }
   */
+  /*
   ICM20600_startup();
   imuTestLoop();
+  */
 end:
 	return;
 }
