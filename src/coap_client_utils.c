@@ -15,6 +15,7 @@
 
 LOG_MODULE_REGISTER(coap_client_utils, CONFIG_COAP_CLIENT_UTILS_LOG_LEVEL);
 
+//How often client will poll for response.
 #define RESPONSE_POLL_PERIOD 100
 
 static int serverSelector = 0;

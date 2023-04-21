@@ -18,4 +18,20 @@
         label = "ICM20600";
     };
 };
-
+/ {
+    encoder {
+        compatible = "gpio-keys";
+        encodercha: encoder_cha {
+            gpios = < &gpio0 3 GPIO_ACTIVE_HIGH>;
+            label = "Encoder Channel A";
+        };
+        encoderchb: encoder_chb {
+            gpios = < &gpio0 4 GPIO_ACTIVE_HIGH>;
+            label = "Encoder Channel B";
+        };
+        encoderindex: encoder_index {
+            gpios = < &gpio0 28 GPIO_ACTIVE_HIGH>;
+            label = "Encoder Index";
+        };
+    };
+};

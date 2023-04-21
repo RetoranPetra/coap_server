@@ -19,6 +19,7 @@
 
 // Control modules
 #include "imu.h"
+#include "AEDB_9140.h"
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
@@ -196,6 +197,13 @@ void main(void)
 	LOG_DBG("Passed openthread_start in main!");
 
 	coap_client_utils_init();
+
+  Setup_interrupt();
+  while (1) {
+    printf("Pos: %d, Vel: %.3f, Acc: %3f\n", Position_counter, velocity, acceleration);
+    k_msleep(100);
+  }
+
 
 
   // See https://openthread.io/reference/group/api-channel-manager
