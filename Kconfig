@@ -24,3 +24,6 @@ module = IMU
 module-str = IMU 20600
 source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
 
+module = ENCODER
+module-str = Encoder AEDB_9140
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"

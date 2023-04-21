@@ -1,4 +1,10 @@
 #include "AEDB_9140.h"
+#include <zephyr/logging/log.h>
+#include <zephyr/drivers/gpio.h>
+#include <math.h>
+#include <zephyr/device.h>
+
+LOG_MODULE_REGISTER(encoder, CONFIG_ENCODER_LOG_LEVEL);
 static const struct gpio_dt_spec ChannelA_Encoder = GPIO_DT_SPEC_GET(DT_NODELABEL(encodercha), gpios);
 static const struct gpio_dt_spec ChannelB_Encoder = GPIO_DT_SPEC_GET(DT_NODELABEL(encoderchb), gpios);
 static const struct gpio_dt_spec ChannelI_Encoder = GPIO_DT_SPEC_GET(DT_NODELABEL(encoderindex), gpios);
@@ -30,10 +36,19 @@ int32_t getIntAcc(void) {
 float getFloatAcc(void) {
   return floatAcc;
 }
-//TODO: Hold setPosition accountable to FullRotationCounter, 
-//prioritise FullRotationCounter readings over setposition ones, as will be more accurate due to less interrupts.
-//TODO: Check if splitting set position so it doesn't rely on gpio_checks makes it work better, 
-//e.g. one func for up on A, one for done on A, same for B etc.
+// TODO: Hold setPosition accountable to FullRotationCounter,
+// prioritise FullRotationCounter readings over setposition ones, as will be
+// more accurate due to less interrupts.
+
+// NOTE: Check if splitting set position so it doesn't rely on gpio_checks makes
+// it work better, e.g. one func for up on A, one for done on A, same for B etc.
+// Don't seem to be able to have two seperate callbacks for one pin.
+
+// NOTE: Reimplement callbacks to be specific to the callback type. Seems to
+// take in an integer, which might be up/down information? Documentation
+// suggests it's just an inbetween, doesn't actually give info to the function.
+
+//TODO: only check GPIO on respective callback, not both.
 void setPosition()
 {
     oldState = newState;

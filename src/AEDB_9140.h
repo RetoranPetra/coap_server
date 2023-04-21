@@ -12,11 +12,6 @@
 
 */
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/gpio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <stdio.h>
-#include <zephyr/device.h>
 
 #define ENCODER_SAMPLE_PERIOD 1E-2
 

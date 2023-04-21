@@ -198,19 +198,17 @@ void main(void)
 
 	coap_client_utils_init();
 
+  LOG_DBG("Passed client start in main!");
   Setup_interrupt();
   for (int i=1;;i++) {
-    printf("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(), getFloatAcc());
-    k_msleep(ENCODER_SAMPLE_PERIOD*10);
+    LOG_DBG("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(), getFloatAcc());
+    k_msleep((int32_t)(ENCODER_SAMPLE_PERIOD*1000.0f));
     setVelocity();
     if (i%3 == 0) {
       setAcceleration();
       i = 0;
     }
   }
-
-
-
   // See https://openthread.io/reference/group/api-channel-manager
   otInstance *inst = openthread_get_default_instance();
   otChannelManagerSetAutoChannelSelectionEnabled(inst, false);
