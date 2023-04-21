@@ -14,7 +14,6 @@ add_compile_options(-Wno-unknown-warning-option)
 FILE(GLOB app_sources src/*.c)
 # NORDIC SDK APP START
 target_sources(app PRIVATE ${app_sources})
-target_sources(app PRIVATE src/AEDB_9140.h)
 
 target_include_directories(app PRIVATE interface)
 

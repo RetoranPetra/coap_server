@@ -201,7 +201,7 @@ void main(void)
   Setup_interrupt();
   for (int i=1;;i++) {
     printf("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(), getFloatAcc());
-    k_msleep(10);
+    k_msleep(ENCODER_SAMPLE_PERIOD*10);
     setVelocity();
     if (i%3 == 0) {
       setAcceleration();
