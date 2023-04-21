@@ -199,9 +199,14 @@ void main(void)
 	coap_client_utils_init();
 
   Setup_interrupt();
-  while (1) {
-    printf("Pos: %d, Vel: %.3f, Acc: %3f\n", Position_counter, velocity, acceleration);
-    k_msleep(100);
+  for (int i=1;;i++) {
+    printf("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(), getFloatAcc());
+    k_msleep(10);
+    setVelocity();
+    if (i%3 == 0) {
+      setAcceleration();
+      i = 0;
+    }
   }
 
 
