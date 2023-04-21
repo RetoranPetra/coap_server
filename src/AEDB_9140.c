@@ -14,7 +14,7 @@ static struct gpio_callback encoderB_callback;
 static struct gpio_callback encoderI_callback;
 
 static const int QEM [4][4] = {{0,-1,1,2},{1,0,2,-1},{-1,2,0,1},{2,1,-1,0}}; // Quadrature Encoder Matrix
-int newState = 0;
+int state = 0;
 int oldState = 0;
 int32_t position =0;
 int32_t position_prevfullrev = 0;
@@ -23,6 +23,9 @@ int32_t intVel = 0;
 float floatVel = 0.0f;
 int32_t intAcc = 0;
 float floatAcc = 0.0f;
+
+int aState = 0;
+int bState = 0;
 
 int32_t getIntVel(void) {
   return intVel;
@@ -48,13 +51,21 @@ float getFloatAcc(void) {
 // take in an integer, which might be up/down information? Documentation
 // suggests it's just an inbetween, doesn't actually give info to the function.
 
-//TODO: only check GPIO on respective callback, not both.
 void setPosition()
 {
-    oldState = newState;
-    newState = (gpio_pin_get_dt(&ChannelB_Encoder) << 1) + gpio_pin_get_dt(&ChannelA_Encoder);
-    position += QEM[newState][oldState];
-    //return newState, oldState, position;
+    static int oldState = 0;
+    state = (bState << 1) + aState;
+    position += QEM[state][oldState];
+    //return state, oldState, position;
+  oldState = state;
+}
+void aChange() {
+  aState = gpio_pin_get_dt(&ChannelA_Encoder);
+  setPosition();
+}
+void bChange() {
+  bState = gpio_pin_get_dt(&ChannelB_Encoder);
+  setPosition();
 }
 
 void FullRotationCounter()
@@ -67,13 +78,12 @@ void FullRotationCounter()
 
 void Setup_interrupt(void)
 {
-    
     gpio_pin_interrupt_configure_dt(&ChannelA_Encoder,GPIO_INT_EDGE_BOTH);
     gpio_pin_interrupt_configure_dt(&ChannelB_Encoder,GPIO_INT_EDGE_BOTH);
     gpio_pin_interrupt_configure_dt(&ChannelI_Encoder,GPIO_INT_EDGE_TO_ACTIVE);
-    gpio_init_callback(&encoderA_callback, setPosition, BIT(ChannelA_Encoder.pin)); 	
+    gpio_init_callback(&encoderA_callback, aChange, BIT(ChannelA_Encoder.pin)); 	
     gpio_add_callback(ChannelA_Encoder.port, &encoderA_callback);
-    gpio_init_callback(&encoderB_callback, setPosition, BIT(ChannelB_Encoder.pin)); 	
+    gpio_init_callback(&encoderB_callback, bChange, BIT(ChannelB_Encoder.pin)); 	
     gpio_add_callback(ChannelB_Encoder.port, &encoderB_callback);
     gpio_init_callback(&encoderI_callback, FullRotationCounter, BIT(ChannelI_Encoder.pin)); 	
     gpio_add_callback(ChannelI_Encoder.port, &encoderI_callback);
@@ -83,7 +93,8 @@ int getPosition(void) {
     return position;
 }
 
-//TODO: Call this automatically with the simple timer module. https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v15.2.0%2Fgroup__app__simple__timer__config.html
+//TODO: Call this automatically with the simple timer module.
+//https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v15.2.0%2Fgroup__app__simple__timer__config.html
 
 //Should be called every period.
 void setVelocity(void) {
