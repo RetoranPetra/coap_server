@@ -40,7 +40,7 @@ const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 void main(void) {
   // Need to sleep at start for logs to display correctly.
-  k_msleep(2000);
+  k_msleep(4000);
   LOG_INF("Start Graph sample");
 	uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
 	int ySteps = 0;
