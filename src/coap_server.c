@@ -21,7 +21,16 @@
 #include "AEDB_9140.h"
 #include "imu.h"
 
+/* 1000 nsec = 1 usec */
+#define MIN_PER 200000
+#define MAX_PER 100000000
+#define full_length_in_steps 3000
+#define pi 3.14159265
+//#define delta_phi = pi/2/100;
+
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
+
+const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -156,68 +165,62 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 void main(void) {
   // Need to sleep at start for logs to display correctly.
   k_msleep(1000);
+uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
+	int ySteps = 0;
+	int32_t encpos = 0;
+	int ret;
+	int dir = 1;
 
-  int ret;
+	Setup_interrupt();
 
-  LOG_INF("Start CoAP-server sample");
+	if (!device_is_ready(P0)) {
+		return;
+	}
 
-  k_timer_init(&led_timer, on_led_timer_expiry, on_led_timer_stop);
-  k_timer_init(&provisioning_timer, on_provisioning_timer_expiry, NULL);
+	ret = gpio_pin_configure(P0, 3, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
 
-  k_work_init(&provisioning_work, activate_provisioning);
+	ret = gpio_pin_configure(P0, 4, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
 
-  ret = ot_coap_init(&deactivate_provisionig, &on_light_request,
-                     &on_generic_request, &on_float_request);
-  if (ret) {
-    LOG_ERR("Could not initialize OpenThread CoAP");
-    goto end;
-  }
+	ret = gpio_pin_configure(P0, 11, GPIO_INPUT);
+	if (ret < 0) {
+		return;
+	}
 
-  ret = dk_leds_init();
-  if (ret) {
-    LOG_ERR("Could not initialize leds, err code: %d", ret);
-    goto end;
-  }
+	printk("Accelerating \n");
+	k_sleep(K_NSEC(4000U*1000U*1000U));
 
-  ret = dk_buttons_init(on_button_changed);
-  if (ret) {
-    LOG_ERR("Cannot init buttons (error: %d)", ret);
-    goto end;
-  }
+	while (1) {
+		encpos = getPosition();
 
-  openthread_state_changed_cb_register(openthread_get_default_context(),
-                                       &ot_state_chaged_cb);
-  openthread_start(openthread_get_default_context());
+		gpio_pin_set(P0, 3, 1);
 
-  LOG_DBG("Passed openthread_start in main!");
+		k_sleep(K_NSEC(period/2U));
 
-  coap_client_utils_init();
+		gpio_pin_set(P0, 3, 0);
 
-  LOG_DBG("Passed client start in main!");
-  Setup_interrupt();
-  encoderTestLoop();
-  // See https://openthread.io/reference/group/api-channel-manager
-  otInstance *inst = openthread_get_default_instance();
-  otChannelManagerSetAutoChannelSelectionEnabled(inst, false);
+		k_sleep(K_NSEC(period/2U));
 
-  // Seems to not work.
+		ySteps++;
 
-  // otChannelManagerSetFavoredChannels(inst, 5); // Doesn't set channel, just
-  //  sets a preferred one so auto selector chooses it more often.
-  // otChannelManagerSetDelay(inst, 1);
-  // otChannelManagerRequestChannelSelect(inst, 7); // Request channel change to
-  //  7, doesn't work it seems.
-  /*
-  LOG_DBG("Favoured channel: %d", otChannelManagerGetFavoredChannels(inst));
-  while (1) {
-    k_msleep(1000);
-    LOG_DBG("Channel is: %d", nrf_802154_channel_get());
-  }
-  */
-  /*
-  ICM20600_startup();
-  imuTestLoop();
-  */
-end:
-  return;
+		printk("ySteps = %u, encoder position = %i",ySteps,encpos);
+
+		if(gpio_pin_get(P0,11) == 1)
+			dir = -dir;
+
+		if(dir == 1)
+			gpio_pin_set(P0, 4, 1);
+		if(dir == -1)
+			gpio_pin_set(P0, 4, 0);
+
+		if(period < MIN_PER)
+			period = MIN_PER;
+		if(period > MAX_PER)
+			period = MAX_PER;
+	}
 }
