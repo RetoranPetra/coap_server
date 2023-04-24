@@ -148,7 +148,7 @@ static void on_generic_request(otChangedFlags flags, struct openthread_context *
 }
 
 static void on_float_request(otChangedFlags flags, struct openthread_context *ot_context, void *user_data) {
-	LOG_DBG("%d\n", ++count);
+	LOG_DBG("Float request triggered: %d\n", ++count);
 	/*
 	gpio_pin_toggle(P0, 3);
 	dk_set_led(LIGHT_LED, led_toggle); //Toggles LED and pin P0.16	

@@ -204,14 +204,18 @@ static void float_request_handler(void *context, otMessage *message,
 				 const otMessageInfo *message_info)
 {
 	//Need to do this with malloc if it's going to be accessed outside this function using srv_context.
-	char myBuffer[FLOAT_PAYLOAD_SIZE] = {};
+	char myBuffer[FLOAT_PAYLOAD_SIZE] = {0};
+	//char check = myBuffer[0];
+	//LOG_DBG("Intialises to:%s\n", myBuffer);
 
 	otMessageRead(message,otMessageGetOffset(message),&myBuffer, FLOAT_PAYLOAD_SIZE);
+	
+	gpio_pin_toggle(r_pulse, 1);
 
 	ARG_UNUSED(context);
 	ARG_UNUSED(message_info);
+	//was here
 
-	gpio_pin_toggle(r_pulse, 1);
 	LOG_INF("Message received is:\n%s",myBuffer);
 	message_float = (float)atof(myBuffer);
 	LOG_DBG("Float message to 2dp is:\n%.2f", message_float);
