@@ -12,7 +12,7 @@
 
 #include "ot_coap_utils.h"
 //L
-#include <zephyr/drivers/gpio.h>
+//#include <zephyr/drivers/gpio.h>
 #include <stdlib.h> //For string to float conversion
 //L
 #include <math.h>
@@ -28,9 +28,7 @@ Button 3 is then pressed to move the motors to that specified position.
 The setting of the position is shown in the log*/
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
-//L
-const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
-//L
+
 //int position = 0; //Changed from Flag
 float fixed_position = 0; //Placeholder for position
 uint8_t led_toggle = 0;	//To toggle the led GPIO when message received
@@ -150,13 +148,15 @@ static void on_generic_request(otChangedFlags flags, struct openthread_context *
 }
 
 static void on_float_request(otChangedFlags flags, struct openthread_context *ot_context, void *user_data) {
+	LOG_DBG("%d\n", ++count);
+	/*
 	gpio_pin_toggle(P0, 3);
 	dk_set_led(LIGHT_LED, led_toggle); //Toggles LED and pin P0.16	
 	LOG_INF("Float Request event execution!");
 	//Change position and fixed position here to floats and set them accordingly
 	fixed_position = get_float();
 	LOG_DBG("GPIO Toggled!\nOn Float Request float to 2dp: %.2f\nMessage Count: %d\n", fixed_position, ++count);
-
+	*/
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = { .state_changed_cb =
@@ -174,19 +174,6 @@ void main(void)
 	int dir = 1;
 	*/
 	int ret;
-	if (!device_is_ready(P0)) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, 3, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, 4, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
 
 	LOG_INF("Start CoAP-server sample");
 
@@ -212,6 +199,7 @@ void main(void)
 		LOG_ERR("Cannot init buttons (error: %d)", ret);
 		goto end;
 	}
+	gpio_inits();
 
 	openthread_state_changed_cb_register(openthread_get_default_context(), &ot_state_chaged_cb);
 	openthread_start(openthread_get_default_context());

@@ -14,11 +14,15 @@
 #include <openthread/thread.h>
 
 #include "ot_coap_utils.h"
+#include <zephyr/drivers/gpio.h>
 #include <stdlib.h> //For string to float conversion
 
 LOG_MODULE_REGISTER(ot_coap_utils, CONFIG_OT_COAP_UTILS_LOG_LEVEL);
 
 float message_float;
+//L
+const struct device *r_pulse = DEVICE_DT_GET(DT_NODELABEL(gpio1));
+//L
 
 struct server_context {
 	struct otInstance *ot;
@@ -216,6 +220,12 @@ static void float_request_handler(void *context, otMessage *message,
 
 float get_float(void){
 	return message_float;
+}
+
+void gpio_inits(void){
+	gpio_pin_configure(r_pulse, 1, GPIO_OUTPUT_INACTIVE);
+	gpio_pin_configure(r_pulse, 2, GPIO_OUTPUT_INACTIVE);
+	LOG_DBG("GPIO pins P1.01 and P1.02 configured to logic level 0");
 }
 
 static void coap_default_handler(void *context, otMessage *message,

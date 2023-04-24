@@ -29,6 +29,7 @@ void ot_coap_deactivate_provisioning(void);
 bool ot_coap_is_provisioning_active(void);
 //L
 float get_float(void);
+void gpio_inits(void);
 //L
 
 #endif
