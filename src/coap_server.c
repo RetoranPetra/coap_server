@@ -34,12 +34,14 @@
 #define print_pin 12
 //#define delta_phi = pi/2/100;
 
+LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
+
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 void main(void) {
   // Need to sleep at start for logs to display correctly.
   k_msleep(1000);
-printk("Accelerating \n");
+  LOG_INF("Start Graph sample");
 	uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
 	int ySteps = 0;
 	int32_t encpos = 0;
@@ -75,7 +77,7 @@ printk("Accelerating \n");
 		return;
 	}
 
-	printk("Accelerating \n");
+	LOG_INF("Start main sample");
 
 	while (1) {
 		encpos = getPosition();
@@ -105,7 +107,7 @@ printk("Accelerating \n");
 
     if(gpio_pin_get(P0,print_pin) == 1){
 			for(int i=0; i<k; i++){
-        printk("%u,%i\n",yStepsGraph[k],encposGraph[k]);
+        LOG_DBG("%u,%i\n",yStepsGraph[k],encposGraph[k]);
       }
     }
 
