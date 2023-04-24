@@ -28,6 +28,10 @@
 #define MAX_PER 100000000
 #define full_length_in_steps 3000
 #define pi 3.14159265
+#define step_pin 29
+#define dir_pin 30
+#define change_dir_pin 11
+#define print_pin 12
 //#define delta_phi = pi/2/100;
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
@@ -35,11 +39,15 @@ const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 void main(void) {
   // Need to sleep at start for logs to display correctly.
   k_msleep(1000);
-uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
+printk("Accelerating \n");
+	uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
 	int ySteps = 0;
 	int32_t encpos = 0;
 	int ret;
 	int dir = 1;
+  int yStepsGraph[10000];
+  int32_t encposGraph[10000];
+  int k = 0;
 
 	Setup_interrupt();
 
@@ -47,46 +55,59 @@ uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
 		return;
 	}
 
-	ret = gpio_pin_configure(P0, 3, GPIO_OUTPUT_INACTIVE);
+	ret = gpio_pin_configure(P0, step_pin, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) {
 		return;
 	}
 
-	ret = gpio_pin_configure(P0, 4, GPIO_OUTPUT_INACTIVE);
+	ret = gpio_pin_configure(P0, dir_pin, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) {
 		return;
 	}
 
-	ret = gpio_pin_configure(P0, 11, GPIO_INPUT);
+	ret = gpio_pin_configure(P0, change_dir_pin, GPIO_INPUT);
+	if (ret < 0) {
+		return;
+	}
+
+  ret = gpio_pin_configure(P0, print_pin, GPIO_INPUT);
 	if (ret < 0) {
 		return;
 	}
 
 	printk("Accelerating \n");
-	k_sleep(K_NSEC(4000U*1000U*1000U));
 
 	while (1) {
 		encpos = getPosition();
 
-		gpio_pin_set(P0, 3, 1);
+		gpio_pin_set(P0, step_pin, 1);
 
 		k_sleep(K_NSEC(period/2U));
 
-		gpio_pin_set(P0, 3, 0);
+		gpio_pin_set(P0, step_pin, 0);
 
 		k_sleep(K_NSEC(period/2U));
 
 		ySteps++;
 
-		printk("ySteps = %u, encoder position = %i",ySteps,encpos);
+    yStepsGraph[k] = ySteps;
+    encposGraph[k] = encpos;
+    k++;
+		
 
-		if(gpio_pin_get(P0,11) == 1)
+		if(gpio_pin_get(P0,change_dir_pin) == 1)
 			dir = -dir;
 
 		if(dir == 1)
-			gpio_pin_set(P0, 4, 1);
+			gpio_pin_set(P0, dir_pin, 1);
 		if(dir == -1)
-			gpio_pin_set(P0, 4, 0);
+			gpio_pin_set(P0, dir_pin, 0);
+
+    if(gpio_pin_get(P0,print_pin) == 1){
+			for(int i=0; i<k; i++){
+        printk("%u,%i\n",yStepsGraph[k],encposGraph[k]);
+      }
+    }
 
 		if(period < MIN_PER)
 			period = MIN_PER;
