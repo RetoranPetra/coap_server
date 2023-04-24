@@ -208,7 +208,7 @@ uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
 
 		ySteps++;
 
-		printk("ySteps = %u, encoder position = %i",ySteps,encpos);
+		printk("ySteps = %u, encoder position = %i",ySteps,encpos); //test
 
 		if(gpio_pin_get(P0,11) == 1)
 			dir = -dir;
