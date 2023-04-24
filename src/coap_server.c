@@ -70,7 +70,7 @@ void main(void)
 
 		ySteps++;
 
-		printk("ySteps = %u, encoder position = %i",ySteps,encpos);
+		printk("ySteps = %u, encoder position = %i",ySteps,encpos); //should work
 
 		if(gpio_pin_get(P0,11) == 1)
 			dir = -dir;
