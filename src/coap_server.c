@@ -195,7 +195,7 @@ void main(void) {
 
   LOG_DBG("Passed client start in main!");
   Setup_interrupt();
-  encoderTestLoop();
+  //encoderTestLoop();
   // See https://openthread.io/reference/group/api-channel-manager
   otInstance *inst = openthread_get_default_instance();
   otChannelManagerSetAutoChannelSelectionEnabled(inst, false);

@@ -1,4 +1,5 @@
 #include "AEDB_9140.h"
+#include "zephyr/kernel.h"
 #include <math.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
@@ -11,6 +12,7 @@ static const struct gpio_dt_spec ChannelB_Encoder =
     GPIO_DT_SPEC_GET(DT_NODELABEL(encoderchb), gpios);
 static const struct gpio_dt_spec ChannelI_Encoder =
     GPIO_DT_SPEC_GET(DT_NODELABEL(encoderindex), gpios);
+
 
 static struct gpio_callback encoderA_callback;
 static struct gpio_callback encoderB_callback;
@@ -75,6 +77,11 @@ void FullRotationCounter() {
   // return FullResolutionPositionCount, position_prev;
 }
 
+void measureInterrupt(struct k_timer *timer_id) {
+  LOG_DBG("Called by kernel!");
+}
+K_TIMER_DEFINE(measureTime,measureInterrupt,NULL);
+
 void Setup_interrupt(void) {
   gpio_pin_interrupt_configure_dt(&ChannelA_Encoder, GPIO_INT_EDGE_BOTH);
   gpio_pin_interrupt_configure_dt(&ChannelB_Encoder, GPIO_INT_EDGE_BOTH);
@@ -87,6 +94,7 @@ void Setup_interrupt(void) {
   // gpio_init_callback(&encoderI_callback, FullRotationCounter,
   //                    BIT(ChannelI_Encoder.pin));
   // gpio_add_callback(ChannelI_Encoder.port, &encoderI_callback);
+  k_timer_start(&measureTime, K_SECONDS(0), K_SECONDS(1));
 }
 
 int32_t getPosition(void) { return position; }
