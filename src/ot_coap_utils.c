@@ -211,6 +211,7 @@ static void float_request_handler(void *context, otMessage *message,
 	ARG_UNUSED(context);
 	ARG_UNUSED(message_info);
 
+	gpio_pin_toggle(r_pulse, 1);
 	LOG_INF("Message received is:\n%s",myBuffer);
 	message_float = (float)atof(myBuffer);
 	LOG_DBG("Float message to 2dp is:\n%.2f", message_float);
