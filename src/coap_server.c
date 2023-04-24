@@ -32,6 +32,7 @@ const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 void main(void)
 {
   k_sleep(K_NSEC(2000U*1000U*1000U));
+  printk("Accelerating \n");
 	uint32_t period = 1U * 1000U * 1000U ; //ms * to_us * to_ns
 	int ySteps = 0;
 	int32_t encpos = 0;
