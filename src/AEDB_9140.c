@@ -4,7 +4,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(encoder, CONFIG_ENCODER_LOG_LEVEL);
+//LOG_MODULE_REGISTER(encoder, CONFIG_ENCODER_LOG_LEVEL);
 static const struct gpio_dt_spec ChannelA_Encoder =
     GPIO_DT_SPEC_GET(DT_NODELABEL(encodercha), gpios);
 static const struct gpio_dt_spec ChannelB_Encoder =
@@ -114,8 +114,8 @@ void setAcceleration(void) {
 
 void encoderTestLoop(void) {
   for (int i = 1;; i++) {
-    LOG_DBG("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(),
-            getFloatAcc());
+    //LOG_DBG("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(),
+           // getFloatAcc());
     k_msleep((int32_t)(ENCODER_SAMPLE_PERIOD * 1000.0f));
     setVelocity();
     if (i % 3 == 0) {
