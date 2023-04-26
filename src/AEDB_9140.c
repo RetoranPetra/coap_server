@@ -13,7 +13,6 @@ static const struct gpio_dt_spec ChannelB_Encoder =
 static const struct gpio_dt_spec ChannelI_Encoder =
     GPIO_DT_SPEC_GET(DT_NODELABEL(encoderindex), gpios);
 
-
 static struct gpio_callback encoderA_callback;
 static struct gpio_callback encoderB_callback;
 static struct gpio_callback encoderI_callback;
@@ -61,7 +60,7 @@ void setPosition(struct k_work *work) {
   // return state, oldState, position;
   oldState = state;
 }
-K_WORK_DEFINE(setPosition_work,setPosition);
+K_WORK_DEFINE(setPosition_work, setPosition);
 void aChange() {
   aState = gpio_pin_get_dt(&ChannelA_Encoder);
   k_work_submit(&setPosition_work);
@@ -84,14 +83,14 @@ void measure(struct k_work *work) {
   if (count % 2 == 0) {
     setAcceleration();
   }
-  LOG_DBG("Vel: %f Acc: %f",floatVel,floatAcc);
+  LOG_DBG("Vel: %f Acc: %f", floatVel, floatAcc);
 }
 K_WORK_DEFINE(measure_work, measure);
 
 void measureInterrupt(struct k_timer *timer_id) {
   k_work_submit(&measure_work);
 }
-K_TIMER_DEFINE(measureTime,measureInterrupt,NULL);
+K_TIMER_DEFINE(measureTime, measureInterrupt, NULL);
 
 void Setup_interrupt(void) {
   gpio_pin_interrupt_configure_dt(&ChannelA_Encoder, GPIO_INT_EDGE_BOTH);
@@ -109,15 +108,16 @@ void Setup_interrupt(void) {
 }
 
 int32_t getPosition(void) { return position; }
-
-// TODO: Call this automatically with the simple timer module.
-// https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v15.2.0%2Fgroup__app__simple__timer__config.html
+// TODO: setVelocity/setAcceleration should do calculations based on the REAL
+// time not the time it thinks has passed. E.I. record time and get difference
+// from last call.
 
 // Should be called every period.
 void setVelocity(void) {
   static int32_t previousPosition = 0;
   intVel = position - previousPosition;
-  floatVel = (float)intVel * (40.85E-6) / (float)ENCODER_SAMPLE_PERIOD_MS*1000.0f;
+  floatVel =
+      (float)intVel * (40.85E-6) / (float)ENCODER_SAMPLE_PERIOD_MS * 1000.0f;
   previousPosition = position;
 }
 // Should be called every 3rd period.
@@ -125,8 +125,8 @@ void setAcceleration(void) {
   static int32_t previousVelocity = 0;
   static float previousFloatVel = 0;
   intAcc = intVel - previousVelocity;
-  floatAcc =
-      (floatVel - previousFloatVel) / (float)ENCODER_SAMPLE_PERIOD_MS / 3.0f*1000.0f;
+  floatAcc = (floatVel - previousFloatVel) / (float)ENCODER_SAMPLE_PERIOD_MS /
+             3.0f * 1000.0f;
   previousVelocity = intVel;
   previousFloatVel = floatVel;
 }

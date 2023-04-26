@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+// Toggles to disable or enable functionality.
+#define CLIENT
+#define SERVER
+#define IMU
+#define ENCODER
+
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
 #include <zephyr/kernel.h>
@@ -13,13 +19,20 @@
 #include <nrf_802154.h>
 #include <openthread/channel_manager.h>
 #include <openthread/channel_monitor.h>
-
+#ifdef CLIENT
 #include "coap_client_utils.h"
+#endif
+#ifdef SERVER
 #include "ot_coap_utils.h"
+#endif
 
 // Control modules
+#ifdef ENCODER
 #include "AEDB_9140.h"
+#endif
+#ifdef IMU
 #include "imu.h"
+#endif
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
@@ -100,6 +113,7 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
+#ifdef CLIENT
 
   if (buttons & DK_BTN4_MSK) {
     k_work_submit(&provisioning_work);
@@ -116,6 +130,8 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
     // coap_client_toggle_one_light();
     coap_client_floatSend(10.768);
   }
+#endif /* ifdef CLIENT
+   */
 }
 
 static void on_thread_state_changed(otChangedFlags flags,
@@ -154,9 +170,13 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
 
 void main(void) {
+  goto setup;
+start:
+  goto end;
+setup:
   // Need to sleep at start for logs to display correctly.
   k_msleep(1000);
-
+#ifdef SERVER
   int ret;
 
   LOG_INF("Start CoAP-server sample");
@@ -190,16 +210,22 @@ void main(void) {
   openthread_start(openthread_get_default_context());
 
   LOG_DBG("Passed openthread_start in main!");
-
+#endif
+#ifdef CLIENT
   coap_client_utils_init();
-
   LOG_DBG("Passed client start in main!");
+#endif /* ifdef CLIENT */
+#ifdef IMU
+  ICM20600_startup();
+#endif /* ifdef IMU */
+#ifdef ENCODER
   Setup_interrupt();
-  //encoderTestLoop();
+#endif /* ifdef ENCODER */
   // See https://openthread.io/reference/group/api-channel-manager
+
+  // Auto channel stuff
   otInstance *inst = openthread_get_default_instance();
   otChannelManagerSetAutoChannelSelectionEnabled(inst, false);
-
   // Seems to not work.
 
   // otChannelManagerSetFavoredChannels(inst, 5); // Doesn't set channel, just
@@ -214,10 +240,7 @@ void main(void) {
     LOG_DBG("Channel is: %d", nrf_802154_channel_get());
   }
   */
-  /*
-  ICM20600_startup();
-  imuTestLoop();
-  */
+  goto start;
 end:
   return;
 }
