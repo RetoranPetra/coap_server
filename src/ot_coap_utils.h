@@ -29,4 +29,5 @@ void ot_coap_deactivate_provisioning(void);
 
 bool ot_coap_is_provisioning_active(void);
 
+double get_double(void);
 #endif
