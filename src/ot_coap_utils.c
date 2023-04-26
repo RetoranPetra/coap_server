@@ -226,6 +226,7 @@ static void percentage_request_handler(void *context, otMessage *message, const 
   }
   LOG_INF("Percentages are: %f %f %f",out.percentages[0],out.percentages[1],out.percentages[2]);
   memcpy(&out.identifier,&myBuffer.identifier,8);
+  out.messsageNum = myBuffer.messageNum;
   srv_context.on_percentage_request(out);
 }
 

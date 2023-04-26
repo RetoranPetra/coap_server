@@ -30,6 +30,7 @@ struct percentageStructHidden {
 };
 struct percentageStruct {
   double percentages[3];
+  uint16_t messsageNum;
   char identifier[8];
 };
 // Payload size seems to be limited to https://stackoverflow.com/questions/42203857/how-much-data-can-hold-coap-in-single-message 127 bytes.
