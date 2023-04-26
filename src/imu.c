@@ -262,6 +262,9 @@ void ICM20600_startup(void) {
   data &= 0xcf; // & 0b11001111
   data |= 0x00;
   ret = i2c_reg_write_byte_dt(&dev_i2c, ICM20600_ACCEL_CONFIG2, data);
+  //Sam's fix
+  ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_XG_OFFS_USRH, 0xEF);
+  ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_XG_OFFS_USRL, 0x34);
 }
 
 int32_t getRawAccelerationX(void) {
