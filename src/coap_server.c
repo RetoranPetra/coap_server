@@ -5,16 +5,18 @@
  */
 
 // Toggles to disable or enable functionality.
+#include "coap_server_client_interface.h"
 #define CLIENT
 #define SERVER
-#define IMU
-#define ENCODER
+//#define IMU
+//#define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/openthread.h>
+#include <zephyr/drivers/gpio.h>
 // Channel management
 #include <nrf_802154.h>
 #include <openthread/channel_manager.h>
@@ -35,6 +37,7 @@
 #endif
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
+
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -128,7 +131,10 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   }
   if (buttons & DK_BTN1_MSK) {
     // coap_client_toggle_one_light();
-    coap_client_floatSend(10.768);
+    //coap_client_floatSend(10.768);
+    struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
+      .identifier = "Hello!"};
+    coap_client_percentageSend(example);
   }
 #endif /* ifdef CLIENT
    */
@@ -165,6 +171,10 @@ on_generic_request( // otChangedFlags flags, struct openthread_context
 }
 
 static void on_float_request(double num) { LOG_INF("Number is: %f", num); }
+static void on_percentage_request(struct percentageStruct percent) {
+  ARG_UNUSED(percent);
+  LOG_INF("Percentage request callback");
+}
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
@@ -172,6 +182,8 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 void main(void) {
   goto setup;
 start:
+  LOG_INF("START!");
+
   goto end;
 setup:
   // Need to sleep at start for logs to display correctly.
@@ -187,7 +199,7 @@ setup:
   k_work_init(&provisioning_work, activate_provisioning);
 
   ret = ot_coap_init(&deactivate_provisionig, &on_light_request,
-                     &on_generic_request, &on_float_request);
+                     &on_generic_request, &on_float_request, &on_percentage_request);
   if (ret) {
     LOG_ERR("Could not initialize OpenThread CoAP");
     goto end;

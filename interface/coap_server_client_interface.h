@@ -23,6 +23,15 @@ struct testStruct {
   float velocity;
   uint16_t timeSinceLast;
 };
+struct percentageStructHidden {
+  uint32_t percentages[3];
+  uint16_t messageNum;
+  char identifier[8];
+};
+struct percentageStruct {
+  double percentages[3];
+  char identifier[8];
+};
 // Payload size seems to be limited to https://stackoverflow.com/questions/42203857/how-much-data-can-hold-coap-in-single-message 127 bytes.
 
 #define PROVISIONING_URI_PATH "provisioning"
@@ -35,6 +44,9 @@ struct testStruct {
 #define GENERIC_PAYLOAD_SIZE 64
 
 #define FLOAT_URI_PATH "float"
+
+#define PERCENTAGE_URI_PATH "percentage"
+#define PERCENTAGE_PAYLOAD_SIZE sizeof(struct percentageStructHidden) //Should be 120.
 
 #define SERVERS 3
 #define CLIENTS 1

@@ -28,6 +28,7 @@ struct server_context {
   provisioning_request_callback_t on_provisioning_request;
   generic_request_callback_t on_generic_request;
   float_request_callback_t on_float_request;
+  percentage_request_callback_t on_percentage_request;
 };
 
 static struct server_context srv_context = {
@@ -60,6 +61,10 @@ static otCoapResource generic_resource = {.mUriPath = GENERIC_URI_PATH,
                                           .mNext = NULL};
 
 static otCoapResource float_resource = {.mUriPath = FLOAT_URI_PATH,
+                                        .mHandler = NULL,
+                                        .mContext = NULL,
+                                        .mNext = NULL};
+static otCoapResource percentage_resource = {.mUriPath = PERCENTAGE_URI_PATH,
                                         .mHandler = NULL,
                                         .mContext = NULL,
                                         .mNext = NULL};
@@ -207,6 +212,22 @@ static void float_request_handler(void *context, otMessage *message,
 
   srv_context.on_float_request(myBuffer);
 }
+static void percentage_request_handler(void *context, otMessage *message, const otMessageInfo *message_info) {
+  struct percentageStructHidden myBuffer = {};
+  otMessageRead(message, otMessageGetOffset(message), &myBuffer, PERCENTAGE_PAYLOAD_SIZE);
+  struct percentageStruct out = {};
+
+  ARG_UNUSED(context);
+  ARG_UNUSED(message_info);
+
+  LOG_INF("Label for percentage received: %s",myBuffer.identifier);
+  for (int i = 0; i<3; i++) {
+    out.percentages[i] = (double)myBuffer.percentages[i] / (double)4294967295;
+  }
+  LOG_INF("Percentages are: %f %f %f",out.percentages[0],out.percentages[1],out.percentages[2]);
+  memcpy(&out.identifier,&myBuffer.identifier,8);
+  srv_context.on_percentage_request(out);
+}
 
 static void coap_default_handler(void *context, otMessage *message,
                                  const otMessageInfo *message_info) {
@@ -233,7 +254,8 @@ bool ot_coap_is_provisioning_active(void) {
 int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
                  light_request_callback_t on_light_request,
                  generic_request_callback_t on_generic_request,
-                 float_request_callback_t on_float_request) {
+                 float_request_callback_t on_float_request,
+                 percentage_request_callback_t on_percentage_request) {
   otError error;
 
   srv_context.provisioning_enabled = false;
@@ -242,6 +264,7 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
   // m
   srv_context.on_generic_request = on_generic_request;
   srv_context.on_float_request = on_float_request;
+  srv_context.on_percentage_request = on_percentage_request;
   // m/
 
   srv_context.ot = openthread_get_default_instance();
@@ -263,6 +286,9 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
 
   float_resource.mContext = srv_context.ot;
   float_resource.mHandler = float_request_handler;
+
+  percentage_resource.mContext=srv_context.ot;
+  percentage_resource.mHandler=percentage_request_handler;
   // m/
 
   otCoapSetDefaultHandler(srv_context.ot, coap_default_handler, NULL);
@@ -271,6 +297,7 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
   // m
   otCoapAddResource(srv_context.ot, &generic_resource);
   otCoapAddResource(srv_context.ot, &float_resource);
+  otCoapAddResource(srv_context.ot, &percentage_resource);
   // m/
 
   error = otCoapStart(srv_context.ot, COAP_PORT);
