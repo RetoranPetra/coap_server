@@ -1,4 +1,5 @@
 #include "AEDB_9140.h"
+#include "zephyr/kernel.h"
 #include <math.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
@@ -52,20 +53,21 @@ float getFloatAcc(void) { return floatAcc; }
 // NOTE: Disabled full rotation counting temporarily, as interrupt happens very
 // close to other needed ones.
 
-void setPosition() {
+void setPosition(struct k_work *work) {
   static int oldState = 0;
   state = (bState << 1) + aState;
   position += QEM[state][oldState];
   // return state, oldState, position;
   oldState = state;
 }
+K_WORK_DEFINE(setPosition_work, setPosition);
 void aChange() {
   aState = gpio_pin_get_dt(&ChannelA_Encoder);
-  setPosition();
+  k_work_submit(&setPosition_work);
 }
 void bChange() {
   bState = gpio_pin_get_dt(&ChannelB_Encoder);
-  setPosition();
+  k_work_submit(&setPosition_work);
 }
 
 void FullRotationCounter() {
@@ -74,6 +76,21 @@ void FullRotationCounter() {
   // printf("Full Rotation Counter: %d",FullResolutionPositionCount);
   // return FullResolutionPositionCount, position_prev;
 }
+
+void measure(struct k_work *work) {
+  static uint8_t count = 0;
+  setVelocity();
+  if (count % 2 == 0) {
+    setAcceleration();
+  }
+  LOG_DBG("Vel: %f Acc: %f", floatVel, floatAcc);
+}
+K_WORK_DEFINE(measure_work, measure);
+
+void measureInterrupt(struct k_timer *timer_id) {
+  k_work_submit(&measure_work);
+}
+K_TIMER_DEFINE(measureTime, measureInterrupt, NULL);
 
 void Setup_interrupt(void) {
   gpio_pin_interrupt_configure_dt(&ChannelA_Encoder, GPIO_INT_EDGE_BOTH);
@@ -87,18 +104,20 @@ void Setup_interrupt(void) {
   // gpio_init_callback(&encoderI_callback, FullRotationCounter,
   //                    BIT(ChannelI_Encoder.pin));
   // gpio_add_callback(ChannelI_Encoder.port, &encoderI_callback);
+  k_timer_start(&measureTime, K_SECONDS(0), K_MSEC(ENCODER_SAMPLE_PERIOD_MS));
 }
 
 int32_t getPosition(void) { return position; }
-
-// TODO: Call this automatically with the simple timer module.
-// https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v15.2.0%2Fgroup__app__simple__timer__config.html
+// TODO: setVelocity/setAcceleration should do calculations based on the REAL
+// time not the time it thinks has passed. E.I. record time and get difference
+// from last call.
 
 // Should be called every period.
 void setVelocity(void) {
   static int32_t previousPosition = 0;
   intVel = position - previousPosition;
-  floatVel = (float)intVel * (40.85E-6) / (float)ENCODER_SAMPLE_PERIOD;
+  floatVel =
+      (float)intVel * (40.85E-6) / (float)ENCODER_SAMPLE_PERIOD_MS * 1000.0f;
   previousPosition = position;
 }
 // Should be called every 3rd period.
@@ -106,8 +125,8 @@ void setAcceleration(void) {
   static int32_t previousVelocity = 0;
   static float previousFloatVel = 0;
   intAcc = intVel - previousVelocity;
-  floatAcc =
-      (floatVel - previousFloatVel) / (float)ENCODER_SAMPLE_PERIOD / 3.0f;
+  floatAcc = (floatVel - previousFloatVel) / (float)ENCODER_SAMPLE_PERIOD_MS /
+             3.0f * 1000.0f;
   previousVelocity = intVel;
   previousFloatVel = floatVel;
 }
@@ -117,6 +136,9 @@ void encoderTestLoop(void) {
     //LOG_DBG("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(),
            // getFloatAcc());
     k_msleep((int32_t)(ENCODER_SAMPLE_PERIOD * 1000.0f));
+    LOG_DBG("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(),
+            getFloatAcc());
+    k_msleep((int32_t)(ENCODER_SAMPLE_PERIOD_MS));
     setVelocity();
     if (i % 3 == 0) {
       setAcceleration();

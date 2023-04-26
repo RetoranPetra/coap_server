@@ -14,7 +14,7 @@
 */
 #include <zephyr/kernel.h>
 
-#define ENCODER_SAMPLE_PERIOD 1E-2
+#define ENCODER_SAMPLE_PERIOD_MS 100
 
 int32_t getIntVel(void);
 float getFloatVel(void);
