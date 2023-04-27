@@ -240,7 +240,7 @@ void main(void) {
 
 		while(ySteps == yTargetSteps){
 			printk("Target Reached");
-			period = 10U * 1000U * 1000U;
+			period = 1U * 900U * 1000U;
 			per_c = period/1000000000.0*2;
 		}
 
@@ -270,10 +270,10 @@ void main(void) {
 		if(dir == -1)
 			gpio_pin_set(P0, dir_pin, 1); //Towards motor
     
-    if( (pi/2/100)*(pi/2/100)/(accel*accel*per_c*per_c*4) + pi/2/100/accel > 0)
-    {
-    	per_c = sqrt((pi/2/100)*(pi/2/100)/(accel*accel*per_c*per_c*4) + pi/2/100/accel) - pi/2/100/(accel*per_c*2);
-	}
+    // if( (pi/2/100)*(pi/2/100)/(accel*accel*per_c*per_c*4) + pi/2/100/accel > 0)
+    // {
+    // 	per_c = sqrt((pi/2/100)*(pi/2/100)/(accel*accel*per_c*per_c*4) + pi/2/100/accel) - pi/2/100/(accel*per_c*2);
+	// }
 		placeholder = per_c*1000000000/2;
 		period = placeholder;
 
