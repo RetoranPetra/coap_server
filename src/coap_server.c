@@ -232,7 +232,7 @@ void main(void) {
 	}
 
 	//gpio_pin_set(P0, mode2_pin, 1);
-
+/*Commenting out from here
 	printk("Accelerating \n");
 	k_sleep(K_NSEC(8000U*1000U*1000U));
 
@@ -288,5 +288,6 @@ void main(void) {
 			LOG_INF("Should have theoretically stopped, per_c = %f\n",per_c);
 		}
 	}
+	*/
 }
 
