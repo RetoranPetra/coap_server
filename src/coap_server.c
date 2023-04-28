@@ -42,7 +42,7 @@ LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
 #define LIGHT_LED DK_LED4
-
+#ifdef SERVER
 static struct k_work provisioning_work;
 
 static struct k_timer led_timer;
@@ -113,14 +113,16 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 
   dk_set_led_off(PROVISIONING_LED);
 }
+#endif
 
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
-#ifdef CLIENT
-
+#ifdef SERVER
   if (buttons & DK_BTN4_MSK) {
     k_work_submit(&provisioning_work);
   }
+#endif
+#ifdef CLIENT
   if (buttons & DK_BTN3_MSK) {
     // Should toggle through server selected.
     serverScroll();
@@ -136,10 +138,9 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
   }
-#endif /* ifdef CLIENT
-   */
+#endif
 }
-
+#ifdef SERVER
 static void on_thread_state_changed(otChangedFlags flags,
                                     struct openthread_context *ot_context,
                                     void *user_data) {
@@ -178,6 +179,7 @@ static void on_percentage_request(struct percentageStruct percent) {
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
+#endif SERVER
 
 void main(void) {
   goto setup;
