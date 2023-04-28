@@ -21,6 +21,9 @@
 
 LOG_MODULE_REGISTER(ot_coap_utils, CONFIG_OT_COAP_UTILS_LOG_LEVEL);
 
+double message_double;
+bool val=false;
+
 struct server_context {
   struct otInstance *ot;
   bool provisioning_enabled;
@@ -199,13 +202,25 @@ static void float_request_handler(void *context, otMessage *message,
 
   otMessageRead(message, otMessageGetOffset(message), &myBuffer,
                 sizeof(double));
-
+  if(val){
+    dk_set_led_on(3);
+  }
+  else{
+    dk_set_led_off(3);
+  }
+  val= !val;
+  
   ARG_UNUSED(context);
   ARG_UNUSED(message_info);
 
+  message_double = myBuffer;
   LOG_INF("Message received is:\n%f", myBuffer);
-
+  
   srv_context.on_float_request(myBuffer);
+}
+
+double get_double(void){
+  return message_double;
 }
 
 static void coap_default_handler(void *context, otMessage *message,
