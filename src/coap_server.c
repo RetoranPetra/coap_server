@@ -51,6 +51,7 @@
 #define mode0_pin 5
 #define delta_phi_start 0.01570796326//pi/2/100;
 
+
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
@@ -255,140 +256,185 @@ void main(void) {
     LOG_DBG("Channel is: %d", nrf_802154_channel_get());
   }
   */
-    uint32_t period = 10U * 1000U * 1000U ; //ms * to_us * to_ns
-    uint32_t scalar = 1U;
-    double per_c = period/1000000000.0;  //ns to s
-    float ySteps = 0;
-    float yTargetSteps = 2000;
-    int ret;
-    int dir = 1;
-    double a = 0;
-    double accel = 0;
-    double delta_phi = delta_phi_start;
-    double placeholder = period;
-    int32_t encpos = 0U;
+	uint32_t period = 10U * 1000U * 1000U ; //ms * to_us * to_ns
+	uint32_t scalar = 1U;
+	double per_c = period/1000000000.0;  //ns to s
+	float ySteps = 0;
+	float yTargetSteps = 2000;
+	int ret;
+	int dir = 1;
+	double a = 0;
+	double accel = 0;
+	double delta_phi = delta_phi_start;
+	double placeholder = period;
+	double interror = 0;
+	double flip = 0;
+  int32_t encpos = 0;
 
-    if (!device_is_ready(P0)) {
-      return;
+	if (!device_is_ready(P0)) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, step_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, dir_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, mode2_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, mode1_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, mode0_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	gpio_pin_set(P0, mode2_pin, 0);
+	gpio_pin_set(P0, mode1_pin, 0);
+	gpio_pin_set(P0, mode0_pin, 0);
+
+	printk("Control \n");
+	k_sleep(K_NSEC(8000U*1000U*1000U));
+
+	while (1) {
+		delta_phi = delta_phi_start/scalar;
+
+		while( yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.1){
+			//printk("Target Reached ");
+			//interror = 0;
+			//yTargetSteps = 3000 - yTargetSteps;
+		}
+
+		gpio_pin_set(P0, step_pin, 1);
+
+		k_sleep(K_NSEC(period/scalar/2U));
+
+		gpio_pin_set(P0, step_pin, 0);
+
+		k_sleep(K_NSEC(period/scalar/2U));
+
+		//ySteps = ySteps + 1.0/scalar*dir;
+    encpos = getPosition();
+    ySteps = 2900.0*encpos/28800.0;
+
+		// if(yTargetSteps-ySteps < 0){
+		// 	if(dir > 0)
+		// 		a = -20*pi;
+		// 	if(dir < 0)
+		// 		a = 15*pi*(yTargetSteps-ySteps)/3000+1;
+			
+		// }
+		// if(yTargetSteps-ySteps > 0){
+		// 	if(dir > 0)
+		// 		a = 15*pi*(yTargetSteps-ySteps)/3000+1;
+		// 	if(dir<0)
+		// 		a = 20*pi;
+		// }
+
+		//interror = interror + (yTargetSteps-ySteps)/3000;
+		if(flip){
+			a = 40*pi*(yTargetSteps-ySteps)/3000 - delta_phi_start/flip*31.0/39.0*dir*2;
+		}
+		else{
+			a = 40*pi*(yTargetSteps-ySteps)/3000 - delta_phi_start/per_c*31.0/39.0*dir*2;
+		}
+
+		accel = a*dir;
+
+		if(dir == 1)
+			gpio_pin_set(P0, dir_pin, 0); //Away from motor
+
+		if(dir == -1)
+			gpio_pin_set(P0, dir_pin, 1); //Towards motor
+
+	  //printf("per_c = %f, ySteps = %f, accel = %f, scalar = %i, dir = %d\n",per_c,ySteps,accel,scalar,dir);
+    
+    if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
+    {
+		flip = per_c;
+		per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) - delta_phi/accel) - delta_phi/(accel*per_c*2);
+		accel = -accel;
+		dir = -dir;
     }
+    else {
+        if(accel > 0.01) 
+        {
+    		    per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
+    	}
+    	else
+            if(accel < -0.01)
+    		{
+    		        per_c = -sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
+    		}
+	}
 
-    ret = gpio_pin_configure(P0, step_pin, GPIO_OUTPUT_INACTIVE);
-    if (ret < 0) {
-      return;
-    }
+		placeholder = per_c*1000000000;
+		period = placeholder;
 
-    ret = gpio_pin_configure(P0, dir_pin, GPIO_OUTPUT_INACTIVE);
-    if (ret < 0) {
-      return;
-    }
+		if(period*scalar < MIN_PER){
+			period = MIN_PER;
+			per_c = period/1000000000.0;
+		}
+		if(period*scalar > MAX_PER){
+			period = MAX_PER;
+			per_c = period/1000000000.0;
+			//printf("Should have theoretically stopped, per_c = %f\n",per_c);
+		}
 
-    ret = gpio_pin_configure(P0, mode2_pin, GPIO_OUTPUT_INACTIVE);
-    if (ret < 0) {
-      return;
-    }
-
-    ret = gpio_pin_configure(P0, mode1_pin, GPIO_OUTPUT_INACTIVE);
-    if (ret < 0) {
-      return;
-    }
-
-    ret = gpio_pin_configure(P0, mode0_pin, GPIO_OUTPUT_INACTIVE);
-    if (ret < 0) {
-      return;
-    }
-
-    gpio_pin_set(P0, mode2_pin, 1);
-    gpio_pin_set(P0, mode1_pin, 1);
-    gpio_pin_set(P0, mode0_pin, 0);
-
-    printk("Control \n");
-    k_sleep(K_NSEC(8000U*1000U*1000U));
-
-    while (1) {
-      delta_phi = delta_phi_start/scalar;
-      encpos = getPosition();
-
-      while( yTargetSteps <= ySteps && ySteps < yTargetSteps+1){
-        printk("Target Reached at %u\n\n",encpos);
-        //period = 2U * 1000U * 1000U;
-        //per_c = period/1000000000.0;
-        yTargetSteps = 3000 - yTargetSteps;
-      }
-
-      gpio_pin_set(P0, step_pin, 1);
-
-      k_sleep(K_NSEC(period/scalar/2U));
-
-      gpio_pin_set(P0, step_pin, 0);
-
-      k_sleep(K_NSEC(period/scalar/2U));
-
-      ySteps = ySteps + 1.0/scalar*dir;
-
-      //printf("period = %u, per_c = %f, ySteps = %f, accel = %f, scalar = %u\n",period,per_c,ySteps,accel,scalar);
-
-      if(yTargetSteps-ySteps < 0){
-        if(dir > 0)
-          a = -20*pi;
-        if(dir < 0)
-          a = 15*pi*(yTargetSteps-ySteps)/3000+1;
-        
-      }
-      if(yTargetSteps-ySteps > 0){
-        if(dir > 0)
-          a = 15*pi*(yTargetSteps-ySteps)/3000+1;
-        if(dir<0)
-          a = 20*pi;
-      }
-
-      accel = a*dir;
-
-      if(dir == 1)
-        gpio_pin_set(P0, dir_pin, 0); //Away from motor
-
-      if(dir == -1)
-        gpio_pin_set(P0, dir_pin, 1); //Towards motor
-      
-      if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
-      {
-      per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) - delta_phi/accel) - delta_phi/(accel*per_c*2);
-      accel = -accel;
-      dir = -dir;
-      }
-      else {
-          if(accel > 0.1) 
-          {
-              per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
-        }
-        else
-              if(accel < -0.1)
-          {
-                  per_c = -sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
-          }
-    }
-
-      placeholder = per_c*1000000000;
-      period = placeholder;
-
-      if(period*scalar < MIN_PER){
-        period = MIN_PER;
-        per_c = period/1000000000.0;
-      }
-      if(period*scalar > MAX_PER){
-        period = MAX_PER;
-        per_c = period/1000000000.0;
-        //printf("Should have theoretically stopped, per_c = %f\n",per_c);
-      }
-
-      if(period/scalar > GEAR_PER+GEAR_GUARD){ //if going slower than a predefined speed
-        scalar = scalar*2U;  //gear down
-      }
-      else{
-        if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
-          scalar = scalar/2U;
-          if(scalar < 1U) scalar = 1U;
-      }
-
-    }
+		if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
+			scalar = scalar*2U;  //gear down
+		}
+		else{
+			if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
+				scalar = scalar/2U;
+				if(scalar < 1U) scalar = 1U;
+		}
+		switch(scalar){
+			case 1U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 0);
+				break;
+			case 2U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 1);
+				break;
+			case 4U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 1);
+				gpio_pin_set(P0, mode0_pin, 0);
+				break;
+			case 8U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 1);
+				gpio_pin_set(P0, mode0_pin, 1);
+				break;
+			case 16U:
+				gpio_pin_set(P0, mode2_pin, 1);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 0);
+				break;
+			case 32U:
+				gpio_pin_set(P0, mode2_pin, 1);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 1);
+				break;
+			default:
+				//printk("Scalar is wrong\n");
+			break;
+		}
+	}
 }
 
