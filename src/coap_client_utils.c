@@ -15,6 +15,8 @@
 
 #include "coap_client_utils.h"
 
+#include "toggler.h"
+
 LOG_MODULE_REGISTER(coap_client_utils, CONFIG_COAP_CLIENT_UTILS_LOG_LEVEL);
 
 // How often client will poll for response.
@@ -297,6 +299,7 @@ static void floatSend(struct k_work *item) {
   } else {
     LOG_DBG("Float message send fail.\n%.3f", *floatPointer);
   }
+  toggleClientPin();
 }
 static void percentageSend(struct k_work *item) {
   ARG_UNUSED(item);

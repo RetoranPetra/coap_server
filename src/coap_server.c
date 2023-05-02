@@ -36,6 +36,8 @@
 #include "imu.h"
 #endif
 
+// Gpio for testing
+#include "toggler.h"
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
 
@@ -133,10 +135,12 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   }
   if (buttons & DK_BTN1_MSK) {
     // coap_client_toggle_one_light();
-    //coap_client_floatSend(10.768);
+    coap_client_floatSend(10.768);
+    /*
     struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
+    */
   }
 #endif
 }
@@ -171,7 +175,11 @@ on_generic_request( // otChangedFlags flags, struct openthread_context
   LOG_INF("Generic Request event execution!");
 }
 
-static void on_float_request(double num) { LOG_INF("Number is: %f", num); }
+static void on_float_request(double num) {
+  toggleServerPin();
+  LOG_INF("Number is: %f", num);
+  coap_client_floatSend(1.0);
+}
 static void on_percentage_request(struct percentageStruct percent) {
   ARG_UNUSED(percent);
   LOG_INF("Percentage request callback");
@@ -179,7 +187,8 @@ static void on_percentage_request(struct percentageStruct percent) {
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
-#endif SERVER
+
+#endif
 
 void main(void) {
   goto setup;
@@ -192,6 +201,7 @@ setup:
   k_msleep(1000);
 #ifdef SERVER
   int ret;
+
 
   LOG_INF("Start CoAP-server sample");
 
@@ -236,6 +246,7 @@ setup:
   Setup_interrupt();
 #endif /* ifdef ENCODER */
   // See https://openthread.io/reference/group/api-channel-manager
+  togglePinSetup();
 
   // Auto channel stuff
   otInstance *inst = openthread_get_default_instance();
