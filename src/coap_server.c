@@ -9,7 +9,7 @@
 #define CLIENT
 #define SERVER
 //#define IMU
-//#define ENCODER
+#define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
@@ -52,6 +52,8 @@
 #define mode1_pin 1
 #define mode0_pin 5
 #define delta_phi_start 0.01570796326//pi/2/100;
+
+//static int yStepsGraph[10000];
 
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
@@ -283,7 +285,7 @@ void main(void) {
 	double per_c = period/1000000000.0;  //ns to s
 	float ySteps = 0;
 	float yTargetSteps = 2000;
-	int ret;
+	//int ret;
 	int dir = 1;
 	double a = 0;
 	double accel = 0;
@@ -291,6 +293,8 @@ void main(void) {
 	double placeholder = period;
 	double interror = 0;
 	double flip = 0;
+  
+  int k = 0;
   int32_t encpos = 0;
 
 	if (!device_is_ready(P0)) {
@@ -333,9 +337,12 @@ void main(void) {
 		delta_phi = delta_phi_start/scalar;
 
 		while( yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.1){
-			//printk("Target Reached ");
-			//interror = 0;
-			//yTargetSteps = 3000 - yTargetSteps;
+      // for(int i = 0; i<k; i++){
+      //   printk("%d\n",yStepsGraph[i]);
+      // }
+			// printk("Target Reached ");
+			// interror = 0;
+			// yTargetSteps = 3000 - yTargetSteps;
 		}
 
 		gpio_pin_set(P0, step_pin, 1);
@@ -347,22 +354,13 @@ void main(void) {
 		k_sleep(K_NSEC(period/scalar/2U));
 
 		//ySteps = ySteps + 1.0/scalar*dir;
+    //printf("encpos = %i ",encpos);
     encpos = getPosition();
     ySteps = 2900.0*encpos/28800.0;
-
-		// if(yTargetSteps-ySteps < 0){
-		// 	if(dir > 0)
-		// 		a = -20*pi;
-		// 	if(dir < 0)
-		// 		a = 15*pi*(yTargetSteps-ySteps)/3000+1;
-			
-		// }
-		// if(yTargetSteps-ySteps > 0){
-		// 	if(dir > 0)
-		// 		a = 15*pi*(yTargetSteps-ySteps)/3000+1;
-		// 	if(dir<0)
-		// 		a = 20*pi;
-		// }
+    // if(k<29999){
+    //   yStepsGraph[k] = ySteps*10;
+    //   k++;
+    // }
 
 		//interror = interror + (yTargetSteps-ySteps)/3000;
 		if(flip){
@@ -458,5 +456,8 @@ void main(void) {
 			break;
 		}
 	}
+
+  end:
+  return;
 }
 
