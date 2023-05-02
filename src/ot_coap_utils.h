@@ -17,13 +17,15 @@ typedef void (*provisioning_request_callback_t)();
 typedef void (*generic_request_callback_t)(char *stringStart);
 typedef void (*float_request_callback_t)(double floatNum);
 typedef void (*percentage_request_callback_t)(struct percentageStruct percent);
+typedef void (*encoder_request_callback_t)(struct encoderMessage encode);
 // m/
 
 int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
                  light_request_callback_t on_light_request,
                  generic_request_callback_t on_generic_request,
                  float_request_callback_t on_float_request,
-                 percentage_request_callback_t on_percentage_request
+                 percentage_request_callback_t on_percentage_request,
+                 encoder_request_callback_t on_encoder_request
                  );
 
 void ot_coap_activate_provisioning(void);
