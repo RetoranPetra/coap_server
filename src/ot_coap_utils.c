@@ -23,6 +23,7 @@ LOG_MODULE_REGISTER(ot_coap_utils, CONFIG_OT_COAP_UTILS_LOG_LEVEL);
 
 double message_double;
 bool val=false;
+int count=0;
 
 struct server_context {
   struct otInstance *ot;
@@ -104,9 +105,11 @@ static otError provisioning_response_send(otMessage *request_message,
 
   // Sends response back as a return
   error = otCoapSendResponse(srv_context.ot, response, message_info);
-
+  
+  //LED goes low when response sent
+  dk_set_led_off(3);
   LOG_HEXDUMP_INF(payload, payload_size, "Sent provisioning response:");
-
+  
 end:
   if (error != OT_ERROR_NONE && response != NULL) {
     otMessageFree(response);
@@ -141,6 +144,9 @@ static void provisioning_request_handler(void *context, otMessage *message,
       srv_context.provisioning_enabled = false;
     }
   }
+  //LED goes low when provisioning message received
+  dk_set_led_on(3);
+  ot_coap_activate_provisioning();
 }
 
 static void light_request_handler(void *context, otMessage *message,
@@ -214,7 +220,7 @@ static void float_request_handler(void *context, otMessage *message,
   ARG_UNUSED(message_info);
 
   message_double = myBuffer;
-  LOG_INF("Message received is:\n%f", myBuffer);
+  LOG_INF("Message received is:%f\nMessage number: %d", myBuffer, ++count);
   
   srv_context.on_float_request(myBuffer);
 }
@@ -239,6 +245,7 @@ void ot_coap_activate_provisioning(void) {
 
 void ot_coap_deactivate_provisioning(void) {
   srv_context.provisioning_enabled = false;
+  ot_coap_activate_provisioning();
 }
 
 bool ot_coap_is_provisioning_active(void) {
