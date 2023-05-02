@@ -9,7 +9,7 @@
 #define CLIENT
 #define SERVER
 //#define IMU
-//#define ENCODER
+#define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
@@ -115,6 +115,8 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 }
 #endif
 
+bool mainloop = false;
+
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
 #ifdef SERVER
@@ -139,9 +141,13 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
+    /*
     struct encoderMessage example = {.position = 3000,
       .messageNum=0,.velocity=20};
     coap_client_encoderSend(example);
+    */
+    LOG_DBG("Start main loop!");
+    mainloop = true;
   }
 #endif
 }
@@ -195,6 +201,16 @@ void main(void) {
   goto setup;
 start:
   LOG_INF("START!");
+
+  while (!mainloop) {
+    k_msleep(500);
+  }
+  while (1) {
+    k_msleep(10);
+    struct encoderMessage out = {.position = getPosition(),.messageNum=0,.velocity=getIntVel()};
+    coap_client_encoderSend(out);
+  }
+
 
   goto end;
 setup:
