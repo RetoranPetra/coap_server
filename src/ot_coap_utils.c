@@ -21,8 +21,10 @@
 
 LOG_MODULE_REGISTER(ot_coap_utils, CONFIG_OT_COAP_UTILS_LOG_LEVEL);
 
-double message_double;
+double message_double = 0;
 bool val=false;
+int count = 0;
+int dropout = 0;
 
 struct server_context {
   struct otInstance *ot;
@@ -202,6 +204,7 @@ static void float_request_handler(void *context, otMessage *message,
 
   otMessageRead(message, otMessageGetOffset(message), &myBuffer,
                 sizeof(double));
+  
   if(val){
     dk_set_led_on(3);
   }
@@ -213,15 +216,22 @@ static void float_request_handler(void *context, otMessage *message,
   ARG_UNUSED(context);
   ARG_UNUSED(message_info);
 
+  dropout = dropout + (myBuffer - message_double - 1);
   message_double = myBuffer;
-  LOG_INF("Message received is:\n%f", myBuffer);
+  LOG_INF("Message received is: %f\tMessage number: %d\n", myBuffer, ++count);
   
   srv_context.on_float_request(myBuffer);
 }
 
 double get_double(void){
+  dropout = 0; //Just for finding package dropout. Remove otherwise
   return message_double;
 }
+
+int get_dropout(void) {
+  return dropout;
+}
+
 
 static void coap_default_handler(void *context, otMessage *message,
                                  const otMessageInfo *message_info) {

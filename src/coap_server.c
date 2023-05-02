@@ -44,6 +44,7 @@ const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 int yTargetSteps=0;
 
+
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
 #define LIGHT_LED DK_LED4
@@ -127,6 +128,10 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed)
 		k_work_submit(&provisioning_work);
 		LOG_INF("Provisioning request sent\n");
 	}
+	if (buttons & DK_BTN1_MSK) {
+		LOG_DBG("Dropout: %f\n", get_dropout());
+		get_double();
+	}
 }
 
 static void on_thread_state_changed(otChangedFlags flags, struct openthread_context *ot_context,
@@ -138,6 +143,7 @@ static void on_thread_state_changed(otChangedFlags flags, struct openthread_cont
 		case OT_DEVICE_ROLE_ROUTER:
 		case OT_DEVICE_ROLE_LEADER:
 			dk_set_led_on(OT_CONNECTION_LED);
+			k_work_submit(&provisioning_work);
 			break;
 
 		case OT_DEVICE_ROLE_DISABLED:
@@ -160,6 +166,7 @@ static void on_generic_request(otChangedFlags flags, struct openthread_context *
 
 static void on_float_request(otChangedFlags flags, struct openthread_context *ot_context, void *user_data) {
 	yTargetSteps = get_double() *3000;
+
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = { .state_changed_cb =

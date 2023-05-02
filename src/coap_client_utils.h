@@ -67,7 +67,6 @@ void coap_client_genericSend(char *msg);
 void coap_client_floatSend(double num);
 
 void serverScroll(void);
-
 #endif
 
 /**
