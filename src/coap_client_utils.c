@@ -286,6 +286,7 @@ static void genericSend(struct k_work *item) {
   } else {
     LOG_DBG("Generic message send fail.\n%s", messagePointer);
   }
+  toggleClientPin();
 }
 static void floatSend(struct k_work *item) {
   ARG_UNUSED(item);

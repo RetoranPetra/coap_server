@@ -42,7 +42,7 @@ struct percentageStruct {
 #define LIGHT_PAYLOAD_SIZE 1
 
 #define GENERIC_URI_PATH "generic"
-#define GENERIC_PAYLOAD_SIZE 64
+#define GENERIC_PAYLOAD_SIZE 127
 
 #define FLOAT_URI_PATH "float"
 

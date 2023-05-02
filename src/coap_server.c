@@ -117,6 +117,7 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 }
 #endif
 
+char message[127] = "Hello there! How are you doing?";
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
 #ifdef SERVER
@@ -135,7 +136,8 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   }
   if (buttons & DK_BTN1_MSK) {
     // coap_client_toggle_one_light();
-    coap_client_floatSend(10.768);
+    //coap_client_floatSend(10.768);
+    coap_client_genericSend(message);
     /*
     struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
       .identifier = "Hello!"};
@@ -172,7 +174,9 @@ on_generic_request( // otChangedFlags flags, struct openthread_context
     char *msg) {
   // Something to deal with message would normally go here. However, message is
   // just character string so it doesn't matter.
+  toggleServerPin();
   LOG_INF("Generic Request event execution!");
+  coap_client_genericSend(msg);
 }
 
 static void on_float_request(double num) {
