@@ -9,7 +9,7 @@
 #define CLIENT
 #define SERVER
 //#define IMU
-#define ENCODER
+//#define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
@@ -204,9 +204,14 @@ static void on_percentage_request(struct percentageStruct percent) {
   LOG_INF("Percentage request callback");
 }
 
+struct encoderMessage currentEncode = {};
 static void on_encoder_request(struct encoderMessage encode) {
-  LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
-  LOG_DBG("Encoder request callback!");
+  //LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
+  //LOG_DBG("Encoder request callback!");
+  if (currentEncode.messageNum + 1 != encode.messageNum) {
+    LOG_INF("Dropped 1!");
+  }
+  currentEncode = encode;
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
@@ -355,7 +360,7 @@ void main(void) {
 
 		//ySteps = ySteps + 1.0/scalar*dir;
     //printf("encpos = %i ",encpos);
-    encpos = getPosition();
+    encpos = currentEncode.position;
     ySteps = 2900.0*encpos/28800.0;
     // if(k<29999){
     //   yStepsGraph[k] = ySteps*10;
