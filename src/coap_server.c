@@ -5,16 +5,18 @@
  */
 
 // Toggles to disable or enable functionality.
-//#define CLIENT
-//#define SERVER
+#include "coap_server_client_interface.h"
+#define CLIENT
+#define SERVER
 //#define IMU
-#define ENCODER
+//#define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/openthread.h>
+#include <zephyr/drivers/gpio.h>
 // Channel management
 #include <nrf_802154.h>
 #include <openthread/channel_manager.h>
@@ -56,10 +58,11 @@ const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
+
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
 #define LIGHT_LED DK_LED4
-
+#ifdef SERVER
 static struct k_work provisioning_work;
 
 static struct k_timer led_timer;
@@ -130,14 +133,16 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 
   dk_set_led_off(PROVISIONING_LED);
 }
+#endif
 
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
-#ifdef CLIENT
-
+#ifdef SERVER
   if (buttons & DK_BTN4_MSK) {
     k_work_submit(&provisioning_work);
   }
+#endif
+#ifdef CLIENT
   if (buttons & DK_BTN3_MSK) {
     // Should toggle through server selected.
     serverScroll();
@@ -148,12 +153,19 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   }
   if (buttons & DK_BTN1_MSK) {
     // coap_client_toggle_one_light();
-    coap_client_floatSend(10.768);
+    //coap_client_floatSend(10.768);
+    /*
+    struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
+      .identifier = "Hello!"};
+    coap_client_percentageSend(example);
+    */
+    struct encoderMessage example = {.position = 3000,
+      .messageNum=0,.velocity=20};
+    coap_client_encoderSend(example);
   }
-#endif /* ifdef CLIENT
-   */
+#endif
 }
-
+#ifdef SERVER
 static void on_thread_state_changed(otChangedFlags flags,
                                     struct openthread_context *ot_context,
                                     void *user_data) {
@@ -185,9 +197,19 @@ on_generic_request( // otChangedFlags flags, struct openthread_context
 }
 
 static void on_float_request(double num) { LOG_INF("Number is: %f", num); }
+static void on_percentage_request(struct percentageStruct percent) {
+  ARG_UNUSED(percent);
+  LOG_INF("Percentage request callback");
+}
+
+static void on_encoder_request(struct encoderMessage encode) {
+  LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
+  LOG_DBG("Encoder request callback!");
+}
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
+#endif
 
 void main(void) {
   // Need to sleep at start for logs to display correctly.
@@ -203,7 +225,7 @@ void main(void) {
   k_work_init(&provisioning_work, activate_provisioning);
 
   ret = ot_coap_init(&deactivate_provisionig, &on_light_request,
-                     &on_generic_request, &on_float_request);
+                     &on_generic_request, &on_float_request, &on_percentage_request, &on_encoder_request);
   if (ret) {
     LOG_ERR("Could not initialize OpenThread CoAP");
     goto end;
