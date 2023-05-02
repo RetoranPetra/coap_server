@@ -57,6 +57,7 @@
 
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+bool mainloop = false;
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
@@ -161,9 +162,11 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-    struct encoderMessage example = {.position = 3000,
-      .messageNum=0,.velocity=20};
-    coap_client_encoderSend(example);
+   mainloop = true;
+   printf("Main loop has started by Bog\n");
+    // struct encoderMessage example = {.position = 3000,
+    //   .messageNum=0,.velocity=20};
+    // coap_client_encoderSend(example);
   }
 #endif
 }
@@ -289,7 +292,7 @@ void main(void) {
 	uint32_t scalar = 1U;
 	double per_c = period/1000000000.0;  //ns to s
 	float ySteps = 0;
-	float yTargetSteps = 2000;
+	float yTargetSteps = 0;
 	//int ret;
 	int dir = 1;
 	double a = 0;
@@ -337,6 +340,9 @@ void main(void) {
 
 	printk("Control \n");
 	k_sleep(K_NSEC(8000U*1000U*1000U));
+  while(!mainloop){
+    k_sleep(K_NSEC(500000U));
+  }
 
 	while (1) {
 		delta_phi = delta_phi_start/scalar;
@@ -359,7 +365,7 @@ void main(void) {
 		k_sleep(K_NSEC(period/scalar/2U));
 
 		//ySteps = ySteps + 1.0/scalar*dir;
-    //printf("encpos = %i ",encpos);
+    printf("encpos = %i ",encpos);
     encpos = currentEncode.position;
     ySteps = 2900.0*encpos/28800.0;
     // if(k<29999){
@@ -383,7 +389,7 @@ void main(void) {
 		if(dir == -1)
 			gpio_pin_set(P0, dir_pin, 1); //Towards motor
 
-	  //printf("per_c = %f, ySteps = %f, accel = %f, scalar = %i, dir = %d\n",per_c,ySteps,accel,scalar,dir);
+	  printf("per_c = %f, ySteps = %f, accel = %f, scalar = %i, dir = %d\n",per_c,ySteps,accel,scalar,dir);
     
     if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
     {
