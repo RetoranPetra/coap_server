@@ -136,8 +136,8 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   }
   if (buttons & DK_BTN1_MSK) {
     // coap_client_toggle_one_light();
-    //coap_client_floatSend(10.768);
-    coap_client_genericSend(message);
+    coap_client_floatSend(10.768);
+    //coap_client_genericSend(message);
     /*
     struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
       .identifier = "Hello!"};
@@ -182,7 +182,7 @@ on_generic_request( // otChangedFlags flags, struct openthread_context
 static void on_float_request(double num) {
   toggleServerPin();
   LOG_INF("Number is: %f", num);
-  coap_client_floatSend(1.0);
+  coap_client_floatSend(num);
 }
 static void on_percentage_request(struct percentageStruct percent) {
   ARG_UNUSED(percent);
