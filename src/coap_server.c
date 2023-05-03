@@ -137,7 +137,6 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   if (buttons & DK_BTN1_MSK) {
     // coap_client_toggle_one_light();
     coap_client_floatSend(10.768);
-    //coap_client_genericSend(message);
     /*
     struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
       .identifier = "Hello!"};
@@ -189,9 +188,13 @@ static void on_percentage_request(struct percentageStruct percent) {
   LOG_INF("Percentage request callback");
 }
 
+static void on_encoder_request(struct encoderMessage encode) {
+  LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
+  LOG_DBG("Encoder request callback!");
+}
+
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
-
 #endif
 
 void main(void) {
@@ -215,7 +218,7 @@ setup:
   k_work_init(&provisioning_work, activate_provisioning);
 
   ret = ot_coap_init(&deactivate_provisionig, &on_light_request,
-                     &on_generic_request, &on_float_request, &on_percentage_request);
+                     &on_generic_request, &on_float_request, &on_percentage_request, &on_encoder_request);
   if (ret) {
     LOG_ERR("Could not initialize OpenThread CoAP");
     goto end;

@@ -14,6 +14,7 @@
 #include <zephyr/net/socket.h>
 
 #include "coap_client_utils.h"
+#include "zephyr/net/coap.h"
 
 #include "toggler.h"
 
@@ -38,9 +39,11 @@ static struct k_work on_disconnect_work;
 static struct k_work genericSend_work;
 static struct k_work floatSend_work;
 static struct k_work percentageSend_work;
+static struct k_work encoderSend_work;
 
 // Must point to something of size GENERIC_PAYLOAD_SIZE
 static char messagePointer[GENERIC_PAYLOAD_SIZE] = {};
+static struct encoderMessage encoderPointer[1] = {};
 
 static double floatPointer[1] = {};
 
@@ -54,6 +57,7 @@ static const char *const provisioning_option[] = {PROVISIONING_URI_PATH, NULL};
 static const char *const generic_option[] = {GENERIC_URI_PATH, NULL};
 static const char *const float_option[] = {FLOAT_URI_PATH, NULL};
 static const char *const percentage_option[] = {PERCENTAGE_URI_PATH,NULL};
+static const char *const encoder_option[] = {ENCODER_URI_PATH,NULL};
 
 /* Thread multicast mesh local address */
 static struct sockaddr_in6 multicast_local_addr = {
@@ -313,6 +317,15 @@ static void percentageSend(struct k_work *item) {
     LOG_DBG("Percentage message send fail.\n%s", percentagePointer->identifier);
   }
 }
+static void encoderSend(struct k_work *item) {
+  ARG_UNUSED(item);
+  if (coap_send_request(COAP_METHOD_PUT, (const struct sockaddr *)&unique_local_addr[serverSelector], encoder_option, (char*)encoderPointer, ENCODER_PAYLOAD_SIZE, NULL) >= 0) {
+    LOG_DBG("Encoder message send success!\n");
+  }
+  else {
+    LOG_DBG("Encoder message send fail!\n");
+  }
+}
 // m/
 
 static void submit_work_if_connected(struct k_work *work) {
@@ -344,6 +357,7 @@ void coap_client_utils_init(/*
   k_work_init(&genericSend_work, genericSend);
   k_work_init(&floatSend_work, floatSend);
   k_work_init(&percentageSend_work,percentageSend);
+  k_work_init(&encoderSend_work,encoderSend);
 
   // openthread_state_changed_cb_register(openthread_get_default_context(),
   // &ot_state_chaged_cb); openthread_start(openthread_get_default_context());
@@ -391,4 +405,11 @@ void coap_client_percentageSend(struct percentageStruct input) {
   memcpy(&percentagePointer->identifier, &input.identifier, 8);
   counter++;
   submit_work_if_connected(&percentageSend_work);
+}
+void coap_client_encoderSend(struct encoderMessage input) {
+  static uint16_t counter = 0;
+  memcpy(encoderPointer, &input, ENCODER_PAYLOAD_SIZE);
+  encoderPointer->messageNum = counter;
+  counter++;
+  submit_work_if_connected(&encoderSend_work);
 }
