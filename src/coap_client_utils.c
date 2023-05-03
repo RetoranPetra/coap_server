@@ -316,7 +316,7 @@ static void percentageSend(struct k_work *item) {
 static void encoderSend(struct k_work *item) {
   ARG_UNUSED(item);
   if (coap_send_request(COAP_METHOD_PUT, (const struct sockaddr *)&unique_local_addr[serverSelector], encoder_option, (char*)encoderPointer, ENCODER_PAYLOAD_SIZE, NULL) >= 0) {
-    LOG_DBG("Encoder message send success!\n");
+    //LOG_DBG("Encoder message send success!\n");
   }
   else {
     LOG_DBG("Encoder message send fail!\n");
