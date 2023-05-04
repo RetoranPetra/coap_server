@@ -40,7 +40,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <math.h>
 /* 1000 nsec = 1 usec */
-#define MIN_PER 400000
+#define MIN_PER 600000
 #define GEAR_PER 2000000//10000000
 #define GEAR_GUARD 400000
 #define MAX_PER 1000000000
@@ -53,7 +53,10 @@
 #define mode0_pin 5
 #define delta_phi_start 0.01570796326//pi/2/100;
 
-//static int yStepsGraph[10000];
+int yStepsGraph[5000];
+int k = 0;
+float ySteps = 0;
+int forPrint = 0;
 
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
@@ -164,6 +167,12 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
     */
    mainloop = true;
    printf("Main loop has started by Bog\n");
+   forPrint++;
+   if(forPrint > 2){
+    for(int i=0; i<k; i++){
+      printf("%d\n",yStepsGraph[i]);
+    }
+   }
     // struct encoderMessage example = {.position = 3000,
     //   .messageNum=0,.velocity=20};
     // coap_client_encoderSend(example);
@@ -220,6 +229,21 @@ static void on_encoder_request(struct encoderMessage encode) {
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
 #endif
+
+void my_work_handler(struct k_work *work)
+{
+	  if(k<5000){
+      yStepsGraph[k] = ySteps*10;
+      k++;
+    }
+}
+K_WORK_DEFINE(my_work, my_work_handler);
+
+void my_timer_handler(struct k_timer *timer_id)
+{
+	k_work_submit(&my_work);
+}
+K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
 
 void main(void) {
   // Need to sleep at start for logs to display correctly.
@@ -288,11 +312,10 @@ void main(void) {
     LOG_DBG("Channel is: %d", nrf_802154_channel_get());
   }
   */
-	uint32_t period = 10U * 1000U * 1000U ; //ms * to_us * to_ns
+	uint32_t period = 5U * 1000U * 1000U ; //ms * to_us * to_ns
 	uint32_t scalar = 1U;
 	double per_c = period/1000000000.0;  //ns to s
-	float ySteps = 0;
-	float yTargetSteps = 0;
+	float yTargetSteps = 2000;
 	//int ret;
 	int dir = 1;
 	double a = 0;
@@ -301,8 +324,6 @@ void main(void) {
 	double placeholder = period;
 	double interror = 0;
 	double flip = 0;
-  
-  int k = 0;
   int32_t encpos = 0;
 
 	if (!device_is_ready(P0)) {
@@ -339,10 +360,12 @@ void main(void) {
 	gpio_pin_set(P0, mode0_pin, 0);
 
 	printk("Control \n");
-	k_sleep(K_NSEC(8000U*1000U*1000U));
+	k_sleep(K_NSEC(3000U*1000U*1000U));
   while(!mainloop){
     k_sleep(K_NSEC(500000U));
   }
+
+  k_timer_start(&my_timer, K_MSEC(0), K_MSEC(20));
 
 	while (1) {
 		delta_phi = delta_phi_start/scalar;
@@ -364,14 +387,10 @@ void main(void) {
 
 		k_sleep(K_NSEC(period/scalar/2U));
 
-		//ySteps = ySteps + 1.0/scalar*dir;
-    printf("encpos = %i ",encpos);
-    encpos = currentEncode.position;
-    ySteps = 2900.0*encpos/28800.0;
-    // if(k<29999){
-    //   yStepsGraph[k] = ySteps*10;
-    //   k++;
-    // }
+		ySteps = ySteps + 1.0/scalar*dir;
+    //printf("encpos = %i ",encpos);
+    // encpos = currentEncode.position;
+    // ySteps = 2900.0*encpos/28800.0;
 
 		//interror = interror + (yTargetSteps-ySteps)/3000;
 		if(flip){
@@ -389,7 +408,7 @@ void main(void) {
 		if(dir == -1)
 			gpio_pin_set(P0, dir_pin, 1); //Towards motor
 
-	  printf("per_c = %f, ySteps = %f, accel = %f, scalar = %i, dir = %d\n",per_c,ySteps,accel,scalar,dir);
+	  //printf("per_c = %f, ySteps = %f, accel = %f, scalar = %i, dir = %d\n",per_c,ySteps,accel,scalar,dir);
     
     if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
     {
