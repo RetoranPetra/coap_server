@@ -300,7 +300,7 @@ static void floatSend(struct k_work *item) {
           (const struct sockaddr *)&unique_local_addr[serverSelector],
           float_option, (char *)floatPointer, sizeof(double), NULL) >= 0) {
 
-    LOG_DBG("Float message send success!\n%.3f", *floatPointer);
+    //LOG_DBG("Float message send success!\n%.3f", *floatPointer);
   } else {
     LOG_DBG("Float message send fail.\n%.3f", *floatPointer);
   }
@@ -312,7 +312,7 @@ static void percentageSend(struct k_work *item) {
           COAP_METHOD_PUT,
           (const struct sockaddr *)&unique_local_addr[serverSelector],
           percentage_option, (char *)percentagePointer, PERCENTAGE_PAYLOAD_SIZE, NULL) >= 0) {
-    LOG_DBG("Percentage message send success!\n%s", percentagePointer->identifier);
+    //LOG_DBG("Percentage message send success!\n%s", percentagePointer->identifier);
   } else {
     LOG_DBG("Percentage message send fail.\n%s", percentagePointer->identifier);
   }
@@ -320,11 +320,12 @@ static void percentageSend(struct k_work *item) {
 static void encoderSend(struct k_work *item) {
   ARG_UNUSED(item);
   if (coap_send_request(COAP_METHOD_PUT, (const struct sockaddr *)&unique_local_addr[serverSelector], encoder_option, (char*)encoderPointer, ENCODER_PAYLOAD_SIZE, NULL) >= 0) {
-    LOG_DBG("Encoder message send success!\n");
+    //LOG_DBG("Encoder message send success!\n");
   }
   else {
     LOG_DBG("Encoder message send fail!\n");
   }
+  toggleClientPin();
 }
 // m/
 
@@ -410,6 +411,9 @@ void coap_client_encoderSend(struct encoderMessage input) {
   static uint16_t counter = 0;
   memcpy(encoderPointer, &input, ENCODER_PAYLOAD_SIZE);
   encoderPointer->messageNum = counter;
+  if (counter%10 == 0) {
+    LOG_DBG("Messagenum:%u",counter);
+  }
   counter++;
   submit_work_if_connected(&encoderSend_work);
 }

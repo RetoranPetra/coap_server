@@ -110,6 +110,7 @@ static void on_led_timer_expiry(struct k_timer *timer_id) {
   val = !val;
 }
 
+int mainLoop = 0;
 static void on_led_timer_stop(struct k_timer *timer_id) {
   ARG_UNUSED(timer_id);
 
@@ -136,7 +137,8 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   }
   if (buttons & DK_BTN1_MSK) {
     // coap_client_toggle_one_light();
-    coap_client_floatSend(10.768);
+    //coap_client_floatSend(10.768);
+    mainLoop = 1;
     /*
     struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
       .identifier = "Hello!"};
@@ -189,8 +191,31 @@ static void on_percentage_request(struct percentageStruct percent) {
 }
 
 static void on_encoder_request(struct encoderMessage encode) {
-  LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
-  LOG_DBG("Encoder request callback!");
+  //Assign -1 messageNum despite it being uinsigned, so that correct.
+  static uint16_t loopNum = 0;
+  static uint16_t lastNum = 0;
+
+  static uint16_t droppedNumber = 0;
+  static uint16_t receivedNumber = 0;
+
+  uint32_t messageNum = 0;
+  if (encode.messageNum == 0) {
+    messageNum = 1;
+  }
+  else {
+    messageNum = encode.messageNum;
+  }
+  if (lastNum + 1 != messageNum) {
+    droppedNumber += messageNum-lastNum-1;
+  }
+  //LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
+  receivedNumber++;
+  if (loopNum%10 == 0) {
+    LOG_DBG("D:%u T:%u",droppedNumber,receivedNumber+droppedNumber);
+  }
+  lastNum = encode.messageNum;
+  loopNum++;
+  toggleServerPin();
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
@@ -201,6 +226,14 @@ void main(void) {
   goto setup;
 start:
   LOG_INF("START!");
+  while (!mainLoop) {
+    k_msleep(1000);
+  }
+  while (1) {
+    static struct encoderMessage msg = {.position = 50, .velocity = 2};
+    k_msleep(6);
+    coap_client_encoderSend(msg);
+  }
 
   goto end;
 setup:
