@@ -17,6 +17,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/openthread.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/flash.h>
 // Channel management
 #include <nrf_802154.h>
 #include <openthread/channel_manager.h>
@@ -53,13 +54,11 @@
 #define mode0_pin 5
 #define delta_phi_start 0.01570796326//pi/2/100;
 
-int yStepsGraph[5000];
-int k = 0;
-float ySteps = 0;
-int forPrint = 0;
+#define addrs 0x0007A000//0x00070000//
+#define notusable 0x9C7B
+#define maxPages 16//6//
+#define arraySize 20
 
-
-const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 bool mainloop = false;
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
@@ -165,14 +164,8 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-   mainloop = true;
    printf("Main loop has started by Bog\n");
-   forPrint++;
-   if(forPrint > 2){
-    for(int i=0; i<k; i++){
-      printf("%d\n",yStepsGraph[i]);
-    }
-   }
+   mainloop = true;
     // struct encoderMessage example = {.position = 3000,
     //   .messageNum=0,.velocity=20};
     // coap_client_encoderSend(example);
@@ -230,23 +223,13 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
 #endif
 
-void my_work_handler(struct k_work *work)
-{
-	  if(k<5000){
-      yStepsGraph[k] = ySteps*10;
-      k++;
-    }
-}
-K_WORK_DEFINE(my_work, my_work_handler);
+const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
-void my_timer_handler(struct k_timer *timer_id)
-{
-	k_work_submit(&my_work);
-}
-K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
+const struct device *flashmem = DEVICE_DT_GET(DT_PATH(soc,flash_controller_4001e000));
 
-void main(void) {
-  // Need to sleep at start for logs to display correctly.
+void main(void)
+{
+    // Need to sleep at start for logs to display correctly.
   k_msleep(1000);
 #ifdef SERVER
   int ret;
@@ -264,6 +247,7 @@ void main(void) {
     LOG_ERR("Could not initialize OpenThread CoAP");
     goto end;
   }
+
 
   ret = dk_leds_init();
   if (ret) {
@@ -293,28 +277,11 @@ void main(void) {
 #ifdef ENCODER
   Setup_interrupt();
 #endif /* ifdef ENCODER */
-  // See https://openthread.io/reference/group/api-channel-manager
 
-  // Auto channel stuff
-  //otInstance *inst = openthread_get_default_instance();
-  //otChannelManagerSetAutoChannelSelectionEnabled(inst, false);
-  // Seems to not work.
-
-  // otChannelManagerSetFavoredChannels(inst, 5); // Doesn't set channel, just
-  //  sets a preferred one so auto selector chooses it more often.
-  // otChannelManagerSetDelay(inst, 1);
-  // otChannelManagerRequestChannelSelect(inst, 7); // Request channel change to
-  //  7, doesn't work it seems.
-  /*
-  LOG_DBG("Favoured channel: %d", otChannelManagerGetFavoredChannels(inst));
-  while (1) {
-    k_msleep(1000);
-    LOG_DBG("Channel is: %d", nrf_802154_channel_get());
-  }
-  */
-	uint32_t period = 5U * 1000U * 1000U ; //ms * to_us * to_ns
+	uint32_t period = 10U * 1000U * 1000U ; //ms * to_us * to_ns
 	uint32_t scalar = 1U;
 	double per_c = period/1000000000.0;  //ns to s
+	float ySteps = 0;
 	float yTargetSteps = 2000;
 	//int ret;
 	int dir = 1;
@@ -322,9 +289,11 @@ void main(void) {
 	double accel = 0;
 	double delta_phi = delta_phi_start;
 	double placeholder = period;
-	double interror = 0;
 	double flip = 0;
-  int32_t encpos = 0;
+	float buf[arraySize];
+	int bufindex = 0;
+	size_t timesFull = 0;
+	struct flash_pages_info pginf;
 
 	if (!device_is_ready(P0)) {
 		return;
@@ -359,24 +328,36 @@ void main(void) {
 	gpio_pin_set(P0, mode1_pin, 0);
 	gpio_pin_set(P0, mode0_pin, 0);
 
+	// ret = flash_get_page_info_by_offs(flashmem, addrs, &pginf);
+	
+	// printf("getinfo ret %d and offset %u, size %u and i %u with max size = %u with doubles per page = %u\n",ret, pginf.start_offset,pginf.size,pginf.index,flash_get_page_count(flashmem), pginf.size/sizeof(per_c));
+	// ret = flash_erase(flashmem, addrs, pginf.size*maxPages);
+	// printf("erase ret %d\n",ret);
+
 	printk("Control \n");
-	k_sleep(K_NSEC(3000U*1000U*1000U));
+	k_sleep(K_NSEC(4000U*1000U*1000U));
+
   while(!mainloop){
-    k_sleep(K_NSEC(500000U));
+    k_sleep(K_NSEC(20000U));
   }
 
-  k_timer_start(&my_timer, K_MSEC(0), K_MSEC(20));
-
-	while (1) {
+	while (1) {		
 		delta_phi = delta_phi_start/scalar;
+		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
 
-		while( yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.1){
-      // for(int i = 0; i<k; i++){
-      //   printk("%d\n",yStepsGraph[i]);
-      // }
-			// printk("Target Reached ");
-			// interror = 0;
-			// yTargetSteps = 3000 - yTargetSteps;
+		if( yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.1){
+			printf("Target Reached with pages = %u \n", timesFull);
+			for(int i=0; i<timesFull; i++){
+				ret = flash_read(flashmem, addrs+i*sizeof(buf), buf, sizeof(buf));
+				if(ret < 0)
+					printf("read ret %d\n",ret);
+				
+				for(int j=0; j<arraySize; j++){
+					printf("%f\n",buf[j]);
+				}
+			}
+
+			return;
 		}
 
 		gpio_pin_set(P0, step_pin, 1);
@@ -387,17 +368,15 @@ void main(void) {
 
 		k_sleep(K_NSEC(period/scalar/2U));
 
-		ySteps = ySteps + 1.0/scalar*dir;
-    //printf("encpos = %i ",encpos);
-    // encpos = currentEncode.position;
-    // ySteps = 2900.0*encpos/28800.0;
+		//ySteps = ySteps + 1.0/scalar*dir;
+    //ySteps = 3000.0*getPosition()/28800.0;
+    ySteps = 3000.0*currentEncode.position/28800.0;
 
-		//interror = interror + (yTargetSteps-ySteps)/3000;
-		if(flip){
-			a = 40*pi*(yTargetSteps-ySteps)/3000 - delta_phi_start/flip*31.0/39.0*dir*2;
+		if(flip != 0){
+			a = 40*pi*(yTargetSteps-ySteps)/3000 - delta_phi_start/flip*31.0/39.0*dir*3;
 		}
 		else{
-			a = 40*pi*(yTargetSteps-ySteps)/3000 - delta_phi_start/per_c*31.0/39.0*dir*2;
+			a = 40*pi*(yTargetSteps-ySteps)/3000 - delta_phi_start/per_c*31.0/39.0*dir*3;
 		}
 
 		accel = a*dir;
@@ -408,8 +387,25 @@ void main(void) {
 		if(dir == -1)
 			gpio_pin_set(P0, dir_pin, 1); //Towards motor
 
-	  //printf("per_c = %f, ySteps = %f, accel = %f, scalar = %i, dir = %d\n",per_c,ySteps,accel,scalar,dir);
-    
+	//printf("per_c = %f, ySteps = %f, accel = %f, scalar = %i, dir = %d\n",per_c,ySteps,accel,scalar,dir);
+	
+	if(bufindex < arraySize){
+		buf[bufindex] = ySteps;
+		bufindex++;
+	}
+	else
+	{
+		if(timesFull*sizeof(buf)<maxPages*pginf.size){
+			ret = flash_write(flashmem, addrs+sizeof(buf)*timesFull, buf, sizeof(buf));
+			if(ret < 0)
+				printf("write ret %d\n",ret);
+			timesFull++;
+			bufindex = 0;
+			buf[bufindex] = ySteps;
+			bufindex++;
+		}
+	}
+	 
     if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
     {
 		flip = per_c;
@@ -442,52 +438,50 @@ void main(void) {
 			//printf("Should have theoretically stopped, per_c = %f\n",per_c);
 		}
 
-		if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
-			scalar = scalar*2U;  //gear down
-		}
-		else{
-			if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
-				scalar = scalar/2U;
-				if(scalar < 1U) scalar = 1U;
-		}
-		switch(scalar){
-			case 1U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 0);
-				break;
-			case 2U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 1);
-				break;
-			case 4U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 1);
-				gpio_pin_set(P0, mode0_pin, 0);
-				break;
-			case 8U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 1);
-				gpio_pin_set(P0, mode0_pin, 1);
-				break;
-			case 16U:
-				gpio_pin_set(P0, mode2_pin, 1);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 0);
-				break;
-			case 32U:
-				gpio_pin_set(P0, mode2_pin, 1);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 1);
-				break;
-			default:
-				//printk("Scalar is wrong\n");
-			break;
-		}
+		// if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
+		// 	scalar = scalar*2U;  //gear down
+		// }
+		// else{
+		// 	if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
+		// 		scalar = scalar/2U;
+		// 		if(scalar < 1U) scalar = 1U;
+		// }
+		// switch(scalar){
+		// 	case 1U:
+		// 		gpio_pin_set(P0, mode2_pin, 0);
+		// 		gpio_pin_set(P0, mode1_pin, 0);
+		// 		gpio_pin_set(P0, mode0_pin, 0);
+		// 		break;
+		// 	case 2U:
+		// 		gpio_pin_set(P0, mode2_pin, 0);
+		// 		gpio_pin_set(P0, mode1_pin, 0);
+		// 		gpio_pin_set(P0, mode0_pin, 1);
+		// 		break;
+		// 	case 4U:
+		// 		gpio_pin_set(P0, mode2_pin, 0);
+		// 		gpio_pin_set(P0, mode1_pin, 1);
+		// 		gpio_pin_set(P0, mode0_pin, 0);
+		// 		break;
+		// 	case 8U:
+		// 		gpio_pin_set(P0, mode2_pin, 0);
+		// 		gpio_pin_set(P0, mode1_pin, 1);
+		// 		gpio_pin_set(P0, mode0_pin, 1);
+		// 		break;
+		// 	case 16U:
+		// 		gpio_pin_set(P0, mode2_pin, 1);
+		// 		gpio_pin_set(P0, mode1_pin, 0);
+		// 		gpio_pin_set(P0, mode0_pin, 0);
+		// 		break;
+		// 	case 32U:
+		// 		gpio_pin_set(P0, mode2_pin, 1);
+		// 		gpio_pin_set(P0, mode1_pin, 0);
+		// 		gpio_pin_set(P0, mode0_pin, 1);
+		// 		break;
+		// 	default:
+		// 		//printk("Scalar is wrong\n");
+		// 	break;
+		// }
 	}
 
-  end:
-  return;
+  end: return;
 }
-
