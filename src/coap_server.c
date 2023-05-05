@@ -206,7 +206,7 @@ start:
     k_msleep(500);
   }
   while (1) {
-    k_msleep(6);
+    k_msleep(10);
     struct encoderMessage out = {.position = getPosition(),.messageNum=0,.velocity=getIntVel()};
     //LOG_DBG("Position:%i",out.position);
     coap_client_encoderSend(out);
