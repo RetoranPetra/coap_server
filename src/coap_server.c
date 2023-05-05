@@ -56,7 +56,7 @@
 
 #define addrs 0x0007A000//0x00070000//
 #define notusable 0x9C7B
-#define maxPages 16//6//
+#define maxPages 6//16//
 #define arraySize 20
 
 bool mainloop = false;
@@ -328,13 +328,13 @@ void main(void)
 	gpio_pin_set(P0, mode1_pin, 0);
 	gpio_pin_set(P0, mode0_pin, 0);
 
-	// ret = flash_get_page_info_by_offs(flashmem, addrs, &pginf);
+	ret = flash_get_page_info_by_offs(flashmem, addrs, &pginf);
 	
-	// printf("getinfo ret %d and offset %u, size %u and i %u with max size = %u with doubles per page = %u\n",ret, pginf.start_offset,pginf.size,pginf.index,flash_get_page_count(flashmem), pginf.size/sizeof(per_c));
-	// ret = flash_erase(flashmem, addrs, pginf.size*maxPages);
-	// printf("erase ret %d\n",ret);
+	printf("getinfo ret %d and offset %u, size %u and i %u with max size = %u with doubles per page = %u\n",ret, pginf.start_offset,pginf.size,pginf.index,flash_get_page_count(flashmem), pginf.size/sizeof(per_c));
+	ret = flash_erase(flashmem, addrs, pginf.size*maxPages);
+	printf("erase ret %d\n",ret);
 
-	printk("Control \n");
+	printk("Control Wirelessly\n");
 	k_sleep(K_NSEC(4000U*1000U*1000U));
 
   while(!mainloop){
