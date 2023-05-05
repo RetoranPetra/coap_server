@@ -6,8 +6,8 @@
 
 // Toggles to disable or enable functionality.
 #include "coap_server_client_interface.h"
-//#define CLIENT
-//#define SERVER
+#define CLIENT
+#define SERVER
 //#define IMU
 #define ENCODER
 
@@ -141,38 +141,38 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 }
 #endif
 
-// static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
-//   uint32_t buttons = button_state & has_changed;
-// #ifdef SERVER
-//   if (buttons & DK_BTN4_MSK) {
-//     k_work_submit(&provisioning_work);
-//   }
-// #endif
-// #ifdef CLIENT
-//   if (buttons & DK_BTN3_MSK) {
-//     // Should toggle through server selected.
-//     serverScroll();
-//   }
-//   if (buttons & DK_BTN2_MSK) {
-//     // Should send a provisioning request.
-//     coap_client_send_provisioning_request();
-//   }
-//   if (buttons & DK_BTN1_MSK) {
-//     // coap_client_toggle_one_light();
-//     //coap_client_floatSend(10.768);
-//     /*
-//     struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
-//       .identifier = "Hello!"};
-//     coap_client_percentageSend(example);
-//     */
-//    printf("Main loop has started by Bog\n");
-//    mainloop = true;
-//     // struct encoderMessage example = {.position = 3000,
-//     //   .messageNum=0,.velocity=20};
-//     // coap_client_encoderSend(example);
-//   }
-// #endif
-// }
+ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
+   uint32_t buttons = button_state & has_changed;
+ #ifdef SERVER
+   if (buttons & DK_BTN4_MSK) {
+     k_work_submit(&provisioning_work);
+   }
+ #endif
+ #ifdef CLIENT
+   if (buttons & DK_BTN3_MSK) {
+     // Should toggle through server selected.
+     serverScroll();
+   }
+   if (buttons & DK_BTN2_MSK) {
+     // Should send a provisioning request.
+     coap_client_send_provisioning_request();
+   }
+   if (buttons & DK_BTN1_MSK) {
+     // coap_client_toggle_one_light();
+     //coap_client_floatSend(10.768);
+     /*
+     struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
+       .identifier = "Hello!"};
+     coap_client_percentageSend(example);
+     */
+    printf("Main loop has started by Bog\n");
+    mainloop = true;
+     // struct encoderMessage example = {.position = 3000,
+     //   .messageNum=0,.velocity=20};
+    // coap_client_encoderSend(example);
+   }
+ #endif
+ }
 #ifdef SERVER
 static void on_thread_state_changed(otChangedFlags flags,
                                     struct openthread_context *ot_context,
@@ -268,7 +268,7 @@ void my_timer_handler(struct k_timer *timer_id)
 	k_work_submit(&my_work);
 }
 K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
-
+/*
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
   if (buttons & DK_BTN4_MSK) {
@@ -284,7 +284,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 	printf("Encpos = %i\n", getPosition());
   }
 }
-
+*/
 //const struct device *flashmem = DEVICE_DT_GET(DT_PATH(soc,flash_controller_4001e000));
 
 
@@ -460,7 +460,7 @@ void main(void)
 
 		//ySteps = ySteps + 1.0/scalar*dir;
 		oldySteps = ySteps;
-    	ySteps = 3000.0*getPosition()/MAXENCODER;
+    	ySteps = 3000.0*currentEncode.position/MAXENCODER;
 
 		if(ySteps == oldySteps){
 			notMovingCounter++;
