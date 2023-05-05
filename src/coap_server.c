@@ -6,10 +6,10 @@
 
 // Toggles to disable or enable functionality.
 #include "coap_server_client_interface.h"
-//#define CLIENT
-//#define SERVER
+#define CLIENT
+#define SERVER
 //#define IMU
-#define ENCODER
+//#define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
@@ -141,38 +141,38 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 }
 #endif
 
-// static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
-//   uint32_t buttons = button_state & has_changed;
-// #ifdef SERVER
-//   if (buttons & DK_BTN4_MSK) {
-//     k_work_submit(&provisioning_work);
-//   }
-// #endif
-// #ifdef CLIENT
-//   if (buttons & DK_BTN3_MSK) {
-//     // Should toggle through server selected.
-//     serverScroll();
-//   }
-//   if (buttons & DK_BTN2_MSK) {
-//     // Should send a provisioning request.
-//     coap_client_send_provisioning_request();
-//   }
-//   if (buttons & DK_BTN1_MSK) {
-//     // coap_client_toggle_one_light();
-//     //coap_client_floatSend(10.768);
-//     /*
-//     struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
-//       .identifier = "Hello!"};
-//     coap_client_percentageSend(example);
-//     */
-//    printf("Main loop has started by Bog\n");
-//    mainloop = true;
-//     // struct encoderMessage example = {.position = 3000,
-//     //   .messageNum=0,.velocity=20};
-//     // coap_client_encoderSend(example);
-//   }
-// #endif
-// }
+static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
+  uint32_t buttons = button_state & has_changed;
+#ifdef SERVER
+  if (buttons & DK_BTN4_MSK) {
+    k_work_submit(&provisioning_work);
+  }
+#endif
+#ifdef CLIENT
+  if (buttons & DK_BTN3_MSK) {
+    // Should toggle through server selected.
+    serverScroll();
+  }
+  if (buttons & DK_BTN2_MSK) {
+    // Should send a provisioning request.
+    coap_client_send_provisioning_request();
+  }
+  if (buttons & DK_BTN1_MSK) {
+    // coap_client_toggle_one_light();
+    //coap_client_floatSend(10.768);
+    /*
+    struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
+      .identifier = "Hello!"};
+    coap_client_percentageSend(example);
+    */
+   printf("Main loop has started by Bog\n");
+   mainloop = true;
+    // struct encoderMessage example = {.position = 3000,
+    //   .messageNum=0,.velocity=20};
+    // coap_client_encoderSend(example);
+  }
+#endif
+}
 #ifdef SERVER
 static void on_thread_state_changed(otChangedFlags flags,
                                     struct openthread_context *ot_context,
@@ -242,9 +242,10 @@ uint32_t uptime = 0;
 uint32_t oldtime = 0;
 float ySteps = 0;
 bool firstTimeAchieve = true;
+bool printNow = false;
 
 float kP = 10.0*pi/3000.0;
-float kD = -500;
+float kD = -900;
 float kI = 10.0/1000.0;
 
 float Poss[100];
@@ -256,9 +257,15 @@ void my_work_handler(struct k_work *work)
 		Poss[possi] = ySteps;
 	}
 	possi++;
-	if(0.4*possi == 4){
-		yTargetSteps = 3000 - yTargetSteps;
+	if(0*possi > 30){
+		//yTargetSteps = 3000 - yTargetSteps;
 		firstTimeAchieve = true;
+		printNow = true;
+		possi = 0;
+		printf("Changing to target %f\n",yTargetSteps);
+		ierr = 0;
+		ySpeed = 0;
+		per_c = 0.1;
 	}
 }
 K_WORK_DEFINE(my_work, my_work_handler);
@@ -269,21 +276,21 @@ void my_timer_handler(struct k_timer *timer_id)
 }
 K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
 
-static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
-  uint32_t buttons = button_state & has_changed;
-  if (buttons & DK_BTN4_MSK) {
-	printf("time is like %u and %u when %u\n", uptime, oldtime, k_uptime_ticks());
-  }
-  if (buttons & DK_BTN3_MSK) {
-	printf("P = %f, I = %f, D = %f, a = %f, error = %f\n",kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed,a,yTargetSteps - ySteps);
-  }
-  if (buttons & DK_BTN2_MSK) {
-	printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d\n",per_c,ySteps,accel,ySpeed,dir);
-  }
-  if (buttons & DK_BTN1_MSK) {
-	printf("Encpos = %i\n", getPosition());
-  }
-}
+// static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
+//   uint32_t buttons = button_state & has_changed;
+//   if (buttons & DK_BTN4_MSK) {
+// 	printf("time is like %u and %u when %u\n", uptime, oldtime, k_uptime_ticks());
+//   }
+//   if (buttons & DK_BTN3_MSK) {
+// 	printf("P = %f, I = %f, D = %f, a = %f, error = %f\n",kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed,a,yTargetSteps - ySteps);
+//   }
+//   if (buttons & DK_BTN2_MSK) {
+// 	printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d\n",per_c,ySteps,accel,ySpeed,dir);
+//   }
+//   if (buttons & DK_BTN1_MSK) {
+// 	printf("Encpos = %i\n", getPosition());
+//   }
+// }
 
 //const struct device *flashmem = DEVICE_DT_GET(DT_PATH(soc,flash_controller_4001e000));
 
@@ -347,7 +354,7 @@ void main(void)
 	// float yTargetSteps = 1500;
 	// float ySpeed = 0;
 	// float ierr = 0;
-	int ret;
+	//int ret;
 	// int dir = 1;
 	// double a = 0;
 	// double accel = 0;
@@ -359,11 +366,11 @@ void main(void)
 	// uint32_t oldtime = 0;
 	printk("Uptime is %u\n",uptime);
 
-	ret = dk_buttons_init(on_button_changed);
-	if (ret) {
-		LOG_ERR("Cannot init buttons (error: %d)", ret);
-		goto end;
-	}
+	// ret = dk_buttons_init(on_button_changed);
+	// if (ret) {
+	// 	LOG_ERR("Cannot init buttons (error: %d)", ret);
+	// 	goto end;
+	// }
 	// float buf[arraySize];
 	// int bufindex = 0;
 	// size_t timesFull = 0;
@@ -408,27 +415,32 @@ void main(void)
 	// ret = flash_erase(flashmem, addrs, pginf.size*maxPages);
 	// printf("erase ret %d\n",ret);
 
-	printk("Control Wirelessly\n");
+	printk("Control Wirelessly Correct\n");
 	k_sleep(K_NSEC(4000U*1000U*1000U));
+
+	while(!mainloop){
+		k_sleep(K_NSEC(20000U));
+	}
+
+	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(200));
 	uptime = k_uptime_ticks();
 	printk("Uptime is %u\n",uptime);
-
-	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(400));
 
 	while (1) {		
 		delta_phi = delta_phi_start/scalar;
 		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
 
-		while( yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.001){
+		while( (yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.001) || printNow){
 			if(firstTimeAchieve){
 			printf("Target Reached in %u\n", uptime);
 
 				for(int i=0; i<100; i++){
 					printf("%f\n",Poss[i]);
 				}
-				printf("Might require up to %d\n",possi);
+				printf("Might require up to %d, rn with every 0.2\n",possi);
 				firstTimeAchieve=false;
 			}
+			printNow = false;
 
 			//return;
 		}
@@ -460,7 +472,7 @@ void main(void)
 
 		//ySteps = ySteps + 1.0/scalar*dir;
 		oldySteps = ySteps;
-    	ySteps = 3000.0*getPosition()/MAXENCODER;
+    	ySteps = 3000.0*currentEncode.position/MAXENCODER;
 
 		if(ySteps == oldySteps){
 			notMovingCounter++;
@@ -480,6 +492,11 @@ void main(void)
 		oldtime = uptime;
 
 		ierr = ierr + (yTargetSteps - ySteps)/3000.0;
+		if(kI*ierr > 20)
+			ierr = 20.0/kI;
+		if(kI*ierr < -20){
+			ierr = -20.0/kI;
+		}
 
 		// if(ySpeed == 0){
 		// 	ySpeed = 10000.0;
