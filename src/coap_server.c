@@ -228,7 +228,7 @@ const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 double per_c = 0;
 float oldySteps = 0;
-float yTargetSteps = 1500;
+float yTargetSteps = 2000;
 float ySpeed = 0;
 float ierr = 0;
 int dir = 1;
@@ -241,10 +241,11 @@ int notMovingCounter = 0;
 uint32_t uptime = 0;
 uint32_t oldtime = 0;
 float ySteps = 0;
+bool firstTimeAchieve = true;
 
-float kP = 30.0*pi/3000.0;
-float kD = -750;
-float kI = 1.5/1000.0;
+float kP = 10.0*pi/3000.0;
+float kD = -500;
+float kI = 10.0/1000.0;
 
 float Poss[100];
 int possi = 0;
@@ -255,6 +256,10 @@ void my_work_handler(struct k_work *work)
 		Poss[possi] = ySteps;
 	}
 	possi++;
+	if(0.4*possi == 4){
+		yTargetSteps = 3000 - yTargetSteps;
+		firstTimeAchieve = true;
+	}
 }
 K_WORK_DEFINE(my_work, my_work_handler);
 
@@ -414,27 +419,21 @@ void main(void)
 		delta_phi = delta_phi_start/scalar;
 		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
 
-		if( yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.001){
+		while( yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.001){
+			if(firstTimeAchieve){
 			printf("Target Reached in %u\n", uptime);
-			// for(int i=0; i<timesFull; i++){
-			// 	ret = flash_read(flashmem, addrs+i*sizeof(buf), buf, sizeof(buf));
-			// 	if(ret < 0)
-			// 		printf("read ret %d\n",ret);
-				
-			// 	for(int j=0; j<arraySize; j++){
-			// 		printf("%f\n",buf[j]);
-			// 	}
-			// }
 
-			for(int i=0; i<100; i++){
-				printf("%f\n",Poss[i]);
+				for(int i=0; i<100; i++){
+					printf("%f\n",Poss[i]);
+				}
+				printf("Might require up to %d\n",possi);
+				firstTimeAchieve=false;
 			}
-			printf("Might require up to %d\n",possi);
 
-			return;
+			//return;
 		}
 
-		if(notMovingCounter> 200 && (ySteps + dir*3<3000)){
+		if(notMovingCounter> 100 && (ySteps + dir*3<3000)){
 			for(int i = 0; i<3; i++){
 				gpio_pin_set(P0, step_pin, 1);
 
@@ -487,7 +486,7 @@ void main(void)
 		// }
 
 		if(flip!=0){
-			ySpeed = (flip+ySpeed)/2;
+			ySpeed = ySpeed/20.0;
 		}
 
 		a = kP*(yTargetSteps-ySteps) + kD*ySpeed + kI*ierr;
@@ -521,7 +520,7 @@ void main(void)
 	 
     if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
     {
-		flip = ySpeed;
+		flip = 1;
 		per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) - delta_phi/accel) - delta_phi/(accel*per_c*2);
 		accel = -accel;
 		dir = -dir;
