@@ -53,6 +53,7 @@
 #define mode1_pin 1
 #define mode0_pin 5
 #define delta_phi_start 0.01570796326//pi/2/100;
+#define MAXENCODER 30000.0
 
 #define addrs 0x0007A000//0x00070000//
 #define notusable 0x9C7B
@@ -230,7 +231,6 @@ float oldySteps = 0;
 float yTargetSteps = 1500;
 float ySpeed = 0;
 float ierr = 0;
-int ret;
 int dir = 1;
 double a = 0;
 double accel = 0;
@@ -242,26 +242,12 @@ uint32_t uptime = 0;
 uint32_t oldtime = 0;
 float ySteps = 0;
 
+float kP = 30.0*pi/3000.0;
+float kD = -750;
+float kI = 1.5/1000.0;
+
 float Poss[100];
 int possi = 0;
-
-static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
-  uint32_t buttons = button_state & has_changed;
-  if (buttons & DK_BTN4_MSK) {
-
-  }
-  if (buttons & DK_BTN3_MSK) {
-    
-  }
-  if (buttons & DK_BTN2_MSK) {
-	printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d\n",per_c,ySteps,accel,ySpeed,dir);
-  }
-  if (buttons & DK_BTN1_MSK) {
-	printf("Encpos = %u\n", getPosition());
-  }
-}
-
-//const struct device *flashmem = DEVICE_DT_GET(DT_PATH(soc,flash_controller_4001e000));
 
 void my_work_handler(struct k_work *work)
 {
@@ -277,6 +263,25 @@ void my_timer_handler(struct k_timer *timer_id)
 	k_work_submit(&my_work);
 }
 K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
+
+static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
+  uint32_t buttons = button_state & has_changed;
+  if (buttons & DK_BTN4_MSK) {
+	printf("time is like %u and %u when %u\n", uptime, oldtime, k_uptime_ticks());
+  }
+  if (buttons & DK_BTN3_MSK) {
+	printf("P = %f, I = %f, D = %f, a = %f, error = %f\n",kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed,a,yTargetSteps - ySteps);
+  }
+  if (buttons & DK_BTN2_MSK) {
+	printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d\n",per_c,ySteps,accel,ySpeed,dir);
+  }
+  if (buttons & DK_BTN1_MSK) {
+	printf("Encpos = %i\n", getPosition());
+  }
+}
+
+//const struct device *flashmem = DEVICE_DT_GET(DT_PATH(soc,flash_controller_4001e000));
+
 
 void main(void)
 {
@@ -337,7 +342,7 @@ void main(void)
 	// float yTargetSteps = 1500;
 	// float ySpeed = 0;
 	// float ierr = 0;
-	// int ret;
+	int ret;
 	// int dir = 1;
 	// double a = 0;
 	// double accel = 0;
@@ -403,14 +408,14 @@ void main(void)
 	uptime = k_uptime_ticks();
 	printk("Uptime is %u\n",uptime);
 
-	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(200));
+	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(400));
 
 	while (1) {		
 		delta_phi = delta_phi_start/scalar;
 		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
 
-		if( yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.1){
-			printf("Target Reached in %u\n", k_uptime_ticks());
+		if( yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.001){
+			printf("Target Reached in %u\n", uptime);
 			// for(int i=0; i<timesFull; i++){
 			// 	ret = flash_read(flashmem, addrs+i*sizeof(buf), buf, sizeof(buf));
 			// 	if(ret < 0)
@@ -456,7 +461,7 @@ void main(void)
 
 		//ySteps = ySteps + 1.0/scalar*dir;
 		oldySteps = ySteps;
-    	ySteps = 1.0*getPosition()/9.85;
+    	ySteps = 3000.0*getPosition()/MAXENCODER;
 
 		if(ySteps == oldySteps){
 			notMovingCounter++;
@@ -477,11 +482,15 @@ void main(void)
 
 		ierr = ierr + (yTargetSteps - ySteps)/3000.0;
 
-		if(ySpeed == 0){
-			ySpeed = 10000.0;
+		// if(ySpeed == 0){
+		// 	ySpeed = 10000.0;
+		// }
+
+		if(flip!=0){
+			ySpeed = (flip+ySpeed)/2;
 		}
 
-		a = ierr/50.0; //40*pi*(yTargetSteps-ySteps)/3000 - delta_phi_start/ySpeed*4 + ierr/50.0;
+		a = kP*(yTargetSteps-ySteps) + kD*ySpeed + kI*ierr;
 
 		accel = a*dir;
 
@@ -512,7 +521,7 @@ void main(void)
 	 
     if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
     {
-		flip = per_c;
+		flip = ySpeed;
 		per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) - delta_phi/accel) - delta_phi/(accel*per_c*2);
 		accel = -accel;
 		dir = -dir;
