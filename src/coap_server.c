@@ -8,6 +8,8 @@
 #include "coap_server_client_interface.h"
 #define CLIENT
 #define SERVER
+#define CLIENT
+#define SERVER
 //#define IMU
 //#define ENCODER
 
@@ -472,6 +474,7 @@ void main(void)
 
 		//ySteps = ySteps + 1.0/scalar*dir;
 		oldySteps = ySteps;
+    	ySteps = 3000.0*currentEncode.position/MAXENCODER;
     	ySteps = 3000.0*currentEncode.position/MAXENCODER;
 
 		if(ySteps == oldySteps){
