@@ -229,8 +229,8 @@ start:
   }
   while (1) {
     k_msleep(Sampling_period);
-	SimpleComplementaryFilter(getRawAccelerationX()*9.81/1000,getRawAccelerationY()*9.81/1000,getRawAccelerationZ()*9.81/1000,getRawGyroscopeX()*2*pi/360,getRawGyroscopeY()*2*pi/360,getRawGyroscopeZ()*2*pi/360,Sampling_period*pow(10,-3));
-	phiToSend = 10000.0*phi;
+	//SimpleComplementaryFilter(getRawAccelerationX()*9.81/1000,getRawAccelerationY()*9.81/1000,getRawAccelerationZ()*9.81/1000,getRawGyroscopeX()*2*pi/360,getRawGyroscopeY()*2*pi/360,getRawGyroscopeZ()*2*pi/360,Sampling_period*pow(10,-3));
+	phiToSend = 10000.0*getRawGyroscopeX()*2*pi/360;
     struct encoderMessage out = {.position = phiToSend,.messageNum=0,.velocity=0};
     //LOG_DBG("Position:%i",out.position);
     coap_client_encoderSend(out);

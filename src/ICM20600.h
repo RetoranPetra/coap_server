@@ -291,8 +291,8 @@ int32_t getRawAccelerationX() {
     int8_t buf[2] = {0};
     int ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_XOUT_H,Buffer);
     buf[0] = Buffer[0];
-    //ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_XOUT_L,Buffer);
-   // buf[1] = Buffer[0];
+    ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_XOUT_L,Buffer);
+    buf[1] = Buffer[0];
     int32_t raw_data = ((int16_t)buf[0] << 8) + buf[1];
     //printf("X: %x,",raw_data);
     raw_data = (raw_data * (32000)) >> 16;
@@ -304,8 +304,8 @@ int32_t getRawAccelerationY() {
     int8_t buf[2] = {0};
     int ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_YOUT_H,Buffer);
     buf[0] = Buffer[0];
-    //ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_YOUT_L,Buffer);
-   //buf[1] = Buffer[0];
+    ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_YOUT_L,Buffer);
+    buf[1] = Buffer[0];
     int32_t raw_data = ((int16_t)buf[0] << 8) + buf[1];
     //printf("Y:  %x\n",raw_data);
     raw_data = (raw_data * (32000)) >> 16;
@@ -317,8 +317,8 @@ int32_t getRawAccelerationZ() {
     int8_t buf[2] = {0};
     int ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_ZOUT_H,Buffer);
     buf[0] = Buffer[0];
-    //ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_ZOUT_L,Buffer);
-    //buf[1] = Buffer[0];
+    ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_ZOUT_L,Buffer);
+    buf[1] = Buffer[0];
     int32_t raw_data = ((int16_t)buf[0] << 8) + buf[1];
     //printf(",Z:  %x\n",raw_data);
     raw_data = (raw_data * (32000)) >> 16;
@@ -331,8 +331,8 @@ int32_t getRawGyroscopeX() {
     int8_t buf[2] = {0};
     int ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_GYRO_XOUT_H,Buffer);
     buf[0] = Buffer[0];
-    //ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_GYRO_XOUT_L,Buffer);
-   // buf[1] = Buffer[0];
+    ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_GYRO_XOUT_L,Buffer);
+    buf[1] = Buffer[0];
     int32_t raw_data = ((int32_t)buf[0] << 8) + buf[1];
     //printf("Gyro_x: %x\n",raw_data);
     raw_data = (raw_data * (4000)) >> 16;
@@ -379,7 +379,7 @@ int32_t getTemperature(void) {
 
 void SimpleComplementaryFilter(double a_x, double a_y, double a_z,double w_x,double w_y,double w_z,double dt)
 {
-    printf("a_x:%f,a_y:%f,a_z:%f,w_x:%f,w_y:%f,w_z:%f,",a_x,a_y,a_z,w_x,w_y,w_z);
+    printf("a_x:%7.4f,a_y:%7.4f,a_z:%7.4f,w_x:%7.4f,w_y:%7.4f,w_z:%7.4f,",a_x,a_y,a_z,w_x,w_y,w_z);
     float norm; // vector norm
     float SEqDot_omega_1, SEqDot_omega_2, SEqDot_omega_3, SEqDot_omega_4; // quaternion derrivative from gyroscopes elements
     float f_1, f_2, f_3; // objective function elements
@@ -450,8 +450,8 @@ void SimpleComplementaryFilter(double a_x, double a_y, double a_z,double w_x,dou
     {
         psi = 0;
     }
-    printf("%f,%f,%f\n",theta,phi,psi);
-    return theta, phi,psi;
+    printf("%7.4f,%7.4f,%7.4f\n",theta,phi,psi);
+    return;
 }
 #endif
 
