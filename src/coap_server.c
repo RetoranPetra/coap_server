@@ -69,78 +69,6 @@ double phi = 0;
 
 bool mainloop = false;
 
-struct encoderMessage currentEncode = {};
-
-void my_work_handler(struct k_work *work)
-{
-	double   xddot = 0;
-	double   t = 0;
-	double   Theta_reference = 0;
-	double   error = 0;
-	double 	 prev_error = 0;
-	double 	 integral_error = 0;
-	double 	 devirative_error =0;
-	double   input =0 ;
-	double   input_prev = 0;
-	double   kp = 4;
-	double   ki = 0;
-	double   kd = 0.8;
-	phi = currentEncode.position;
-	//SimpleComplementaryFilter(getRawAccelerationX()*9.81/1000,getRawAccelerationY()*9.81/1000,getRawAccelerationZ()*9.81/1000,getRawGyroscopeX()*2*pi/360,getRawGyroscopeY()*2*pi/360,getRawGyroscopeZ()*2*pi/360,Sampling_period*pow(10,-3));
-	
-	//printf("Start t = %f\n", t);
-	//printf("Demand Velocity is: %f\n",Vm);
-	input_prev = input;
-	prev_error = error; 
-	//printf("Prev input: %f",input_prev);
-	error = Theta_reference - (-phi); 
-	///printf("Error: %f",error);
-	integral_error = integral_error + error*Sampling_period;
-	devirative_error = (error - prev_error)/Sampling_period;
-	input = (kp*error + ki*integral_error + kd*devirative_error); // PID Control
-	if(input < 0)
-	{
-		gpio_pin_set_dt(&DIR,1);
-	}
-	else
-	{
-		gpio_pin_set_dt(&DIR,0);
-	}
-	if(Step_time_interval <= 0)
-	{
-		Step_time_interval = -Step_time_interval;
-	}
-	if(input <= 0)
-	{
-		input = -input;
-	}
-	if(input < 66.75 && input > 0.134){
-		Step_time_interval = (distance_per_step/(input*66.75/(0.10)))*pow(10,6);
-		
-	}
-	else if(input > 66.75)
-	{
-		Step_time_interval = 4; 
-	}
-	else if(input < 0.134)
-	{
-		Step_time_interval = 2000; 
-	}
-	//printf("Step Period: %f,Error: %f,Input: %f,Theta: %f,Phi:%f,Psi:%f\n",Step_time_interval,error,input,theta,phi,psi);
-	//printf("Input: %f,Theta:%f,\n",input,phi);
-	
-	
-	//printf("Step Period: %f,Theta: %f,Phi:%f,Psi:%f\n",Step_time_interval,theta,phi,psi);
-	//t++;
-}
-K_WORK_DEFINE(my_work, my_work_handler);
-
-void my_timer_handler(struct k_timer *timer_id)
-{
-	k_work_submit(&my_work);
-}
-K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
-
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
@@ -259,6 +187,7 @@ static void on_percentage_request(struct percentageStruct percent) {
   LOG_INF("Percentage request callback");
 }
 
+struct encoderMessage currentEncode = {};
 static void on_encoder_request(struct encoderMessage encode) {
   //LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
   //LOG_DBG("Encoder request callback!");
@@ -324,7 +253,78 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 // }
 
 //const struct device *flashmem = DEVICE_DT_GET(DT_PATH(soc,flash_controller_4001e000));
+void my_work_handler(struct k_work *work)
+{
+	
+	double   xddot = 0;
+	double   t = 0;
+	double   Theta_reference = 0;
+	double   error = 0;
+	double 	 prev_error = 0;
+	double 	 integral_error = 0;
+	double 	 devirative_error =0;
+	double   input =0 ;
+	double   input_prev = 0;
+	double   kp = 4;
+	double   ki = 0;
+	double   kd = 0.8;
+	phi = (float) currentEncode.position / 10000.0;
+	printf("We are in work handler with phi %f\n", phi);
+	//SimpleComplementaryFilter(getRawAccelerationX()*9.81/1000,getRawAccelerationY()*9.81/1000,getRawAccelerationZ()*9.81/1000,getRawGyroscopeX()*2*pi/360,getRawGyroscopeY()*2*pi/360,getRawGyroscopeZ()*2*pi/360,Sampling_period*pow(10,-3));
+	
+	//printf("Start t = %f\n", t);
+	//printf("Demand Velocity is: %f\n",Vm);
+	input_prev = input;
+	prev_error = error; 
+	//printf("Prev input: %f",input_prev);
+	error = Theta_reference - (-phi); 
+	///printf("Error: %f",error);
+	integral_error = integral_error + error*Sampling_period;
+	devirative_error = (error - prev_error)/Sampling_period;
+	input = (kp*error + ki*integral_error + kd*devirative_error); // PID Control
+	if(input < 0)
+	{
+		gpio_pin_set_dt(&DIR,1);
+	}
+	else
+	{
+		gpio_pin_set_dt(&DIR,0);
+	}
+	if(Step_time_interval <= 0)
+	{
+		Step_time_interval = -Step_time_interval;
+	}
+	if(input <= 0)
+	{
+		input = -input;
+	}
+	if(input < 66.75 && input > 0.134){
+		Step_time_interval = (distance_per_step/(input*66.75/(0.10)))*pow(10,6);
+		
+	}
+	else if(input > 66.75)
+	{
+		Step_time_interval = 4; 
+	}
+	else if(input < 0.134)
+	{
+		Step_time_interval = 2000; 
+	}
+	printf("We are in work handler with step interval %f\n", Step_time_interval);
+	//printf("Step Period: %f,Error: %f,Input: %f,Theta: %f,Phi:%f,Psi:%f\n",Step_time_interval,error,input,theta,phi,psi);
+	//printf("Input: %f,Theta:%f,\n",input,phi);
+	
+	
+	//printf("Step Period: %f,Theta: %f,Phi:%f,Psi:%f\n",Step_time_interval,theta,phi,psi);
+	//t++;
+}
+K_WORK_DEFINE(my_work, my_work_handler);
 
+void my_timer_handler(struct k_timer *timer_id)
+{
+	k_work_submit(&my_work);
+}
+K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
 
 void main(void)
 {
@@ -395,7 +395,9 @@ void main(void)
 	}
 
 	k_timer_start(&my_timer, K_SECONDS(0), K_MSEC(Sampling_period));
-	while (1) {		
+	printk("Timer Started\n");
+	while (1) {	
+		printk("Stepping\n");	
 		if(Step_time_interval<10000 && Step_time_interval>4)
 		{
 			gpio_pin_set_dt(&STEP,1);
