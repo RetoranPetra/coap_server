@@ -63,6 +63,8 @@
 #define arraySize 20
 
 bool mainloop = false;
+bool newMessage = false;
+
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
@@ -143,38 +145,7 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 }
 #endif
 
-static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
-  uint32_t buttons = button_state & has_changed;
-#ifdef SERVER
-  if (buttons & DK_BTN4_MSK) {
-    k_work_submit(&provisioning_work);
-  }
-#endif
-#ifdef CLIENT
-  if (buttons & DK_BTN3_MSK) {
-    // Should toggle through server selected.
-    serverScroll();
-  }
-  if (buttons & DK_BTN2_MSK) {
-    // Should send a provisioning request.
-    coap_client_send_provisioning_request();
-  }
-  if (buttons & DK_BTN1_MSK) {
-    // coap_client_toggle_one_light();
-    //coap_client_floatSend(10.768);
-    /*
-    struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
-      .identifier = "Hello!"};
-    coap_client_percentageSend(example);
-    */
-   printf("Main loop has started by Bog\n");
-   mainloop = true;
-    // struct encoderMessage example = {.position = 3000,
-    //   .messageNum=0,.velocity=20};
-    // coap_client_encoderSend(example);
-  }
-#endif
-}
+
 #ifdef SERVER
 static void on_thread_state_changed(otChangedFlags flags,
                                     struct openthread_context *ot_context,
@@ -220,6 +191,7 @@ static void on_encoder_request(struct encoderMessage encode) {
     LOG_INF("Dropped 1!");
   }
   currentEncode = encode;
+  newMessage = true;
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
@@ -242,6 +214,7 @@ double flip = 0;
 int notMovingCounter = 0;
 uint32_t uptime = 0;
 uint32_t oldtime = 0;
+uint32_t collectTimeDone = 0;
 float ySteps = 0;
 bool firstTimeAchieve = true;
 bool printNow = false;
@@ -253,6 +226,39 @@ float kI = 10.0/1000.0;
 float Poss[100];
 int possi = 0;
 
+static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
+  uint32_t buttons = button_state & has_changed;
+#ifdef SERVER
+  if (buttons & DK_BTN4_MSK) {
+    k_work_submit(&provisioning_work);
+  }
+#endif
+#ifdef CLIENT
+  if (buttons & DK_BTN3_MSK) {
+    // Should toggle through server selected.
+    serverScroll();
+  }
+  if (buttons & DK_BTN2_MSK) {
+    // Should send a provisioning request.
+    coap_client_send_provisioning_request();
+  }
+  if (buttons & DK_BTN1_MSK) {
+    // coap_client_toggle_one_light();
+    //coap_client_floatSend(10.768);
+    /*
+    struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
+      .identifier = "Hello!"};
+    coap_client_percentageSend(example);
+    */
+   printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.position);
+   mainloop = true;
+    // struct encoderMessage example = {.position = 3000,
+    //   .messageNum=0,.velocity=20};
+    // coap_client_encoderSend(example);
+  }
+#endif
+}
+
 void my_work_handler(struct k_work *work)
 {
 	if(possi < 100){
@@ -261,7 +267,7 @@ void my_work_handler(struct k_work *work)
 	possi++;
 	if(0*possi > 30){
 		//yTargetSteps = 3000 - yTargetSteps;
-		firstTimeAchieve = true;
+		//firstTimeAchieve = true;
 		printNow = true;
 		possi = 0;
 		printf("Changing to target %f\n",yTargetSteps);
@@ -424,7 +430,7 @@ void main(void)
 		k_sleep(K_NSEC(20000U));
 	}
 
-	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(200));
+	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(80));
 	uptime = k_uptime_ticks();
 	printk("Uptime is %u\n",uptime);
 
@@ -432,19 +438,19 @@ void main(void)
 		delta_phi = delta_phi_start/scalar;
 		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
 
-		while( (yTargetSteps-1 <= ySteps && ySteps < yTargetSteps+1 && per_c > 0.001) || printNow){
-			if(firstTimeAchieve){
-			printf("Target Reached in %u\n", uptime);
-
-				for(int i=0; i<100; i++){
-					printf("%f\n",Poss[i]);
-				}
-				printf("Might require up to %d, rn with every 0.2\n",possi);
-				firstTimeAchieve=false;
+		if( ( (yTargetSteps-3 <= ySteps) && (ySteps < yTargetSteps+3) && (per_c > 0.001) ) && firstTimeAchieve){
+			printf("Time has been done\n");
+			if(possi < 100){
+			Poss[possi] = 0;
 			}
-			printNow = false;
+			possi++;
+			collectTimeDone = uptime;
+			firstTimeAchieve = false;
+			goto toend;
+		}
 
-			//return;
+		if((uptime - collectTimeDone > 32876*15) && !firstTimeAchieve){
+			goto toend;
 		}
 
 		if(notMovingCounter> 100 && (ySteps + dir*3<3000)){
@@ -473,8 +479,9 @@ void main(void)
 		k_sleep(K_NSEC(period/scalar/2U));
 
 		//ySteps = ySteps + 1.0/scalar*dir;
+	if(newMessage){
+		newMessage = false;
 		oldySteps = ySteps;
-    	ySteps = 3000.0*currentEncode.position/MAXENCODER;
     	ySteps = 3000.0*currentEncode.position/MAXENCODER;
 
 		if(ySteps == oldySteps){
@@ -494,7 +501,7 @@ void main(void)
 		}
 		oldtime = uptime;
 
-		ierr = ierr + (yTargetSteps - ySteps)/3000.0;
+		ierr = ierr + (yTargetSteps - ySteps)/3000.0*(uptime-oldtime)/32786.0/0.1;
 		if(kI*ierr > 20)
 			ierr = 20.0/kI;
 		if(kI*ierr < -20){
@@ -504,6 +511,7 @@ void main(void)
 		// if(ySpeed == 0){
 		// 	ySpeed = 10000.0;
 		// }
+	
 
 		if(flip!=0){
 			ySpeed = ySpeed/20.0;
@@ -614,6 +622,15 @@ void main(void)
 			break;
 		}
 	}
+	}
+
+  toend: 
+		printf("Target Reached in %u\n", uptime);
+
+		for(int i=0; i<100; i++){
+			printf("%f\n",Poss[i]);
+		}
+		printf("Might require up to %d, rn with every 0.08\n",possi);
 
   end: return;
 }
