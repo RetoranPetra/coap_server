@@ -8,9 +8,7 @@
 #include "coap_server_client_interface.h"
 #define CLIENT
 #define SERVER
-#define CLIENT
-#define SERVER
-//#define IMU
+#define IMU
 //#define ENCODER
 
 #include <dk_buttons_and_leds.h>
@@ -36,7 +34,7 @@
 #include "AEDB_9140.h"
 #endif
 #ifdef IMU
-#include "imu.h"
+//#include "ICM20600.h"
 #endif
 
 #include <stdio.h>
@@ -45,25 +43,103 @@
 /* 1000 nsec = 1 usec */
 #define MIN_PER 600000
 #define GEAR_PER 2000000//10000000
-#define GEAR_GUARD 400000
-#define MAX_PER 1000000000
-#define full_length_in_steps 3000
-#define pi 3.14159265
-#define step_pin 29
-#define dir_pin 30
-#define mode2_pin 0
-#define mode1_pin 1
-#define mode0_pin 5
-#define delta_phi_start 0.01570796326//pi/2/100;
-#define MAXENCODER 30000.0
+#define Sampling_period 10 // in milli  secs
+#define pi 3.14159265359
+#define radius 8.5E-3
+#define distance_per_step 2.0*3.14*8.5E-3/200.0
 
-#define addrs 0x0007A000//0x00070000//
-#define notusable 0x9C7B
-#define maxPages 6//16//
-#define arraySize 20
+#define Stepper_Pin DT_ALIAS(stepper)
+#define Direction_pin DT_ALIAS(stepperdir)
+#define M0_Pin DT_ALIAS(m0)
+#define M1_Pin DT_ALIAS(m1)
+#define M2_Pin DT_ALIAS(m2)
+
+#define GEAR_PER 2000000//10000000
+#define GEAR_GUARD 400000
+
+static const struct gpio_dt_spec STEP = GPIO_DT_SPEC_GET(Stepper_Pin, gpios);
+static const struct gpio_dt_spec DIR = GPIO_DT_SPEC_GET(Direction_pin, gpios);
+
+
+double Step_time_interval;
+
+double   Vm = 0;
+
+double phi = 0;
 
 bool mainloop = false;
-bool newMessage = false;
+
+struct encoderMessage currentEncode = {};
+
+void my_work_handler(struct k_work *work)
+{
+	double   xddot = 0;
+	double   t = 0;
+	double   Theta_reference = 0;
+	double   error = 0;
+	double 	 prev_error = 0;
+	double 	 integral_error = 0;
+	double 	 devirative_error =0;
+	double   input =0 ;
+	double   input_prev = 0;
+	double   kp = 4;
+	double   ki = 0;
+	double   kd = 0.8;
+	phi = currentEncode.position;
+	//SimpleComplementaryFilter(getRawAccelerationX()*9.81/1000,getRawAccelerationY()*9.81/1000,getRawAccelerationZ()*9.81/1000,getRawGyroscopeX()*2*pi/360,getRawGyroscopeY()*2*pi/360,getRawGyroscopeZ()*2*pi/360,Sampling_period*pow(10,-3));
+	
+	//printf("Start t = %f\n", t);
+	//printf("Demand Velocity is: %f\n",Vm);
+	input_prev = input;
+	prev_error = error; 
+	//printf("Prev input: %f",input_prev);
+	error = Theta_reference - (-phi); 
+	///printf("Error: %f",error);
+	integral_error = integral_error + error*Sampling_period;
+	devirative_error = (error - prev_error)/Sampling_period;
+	input = (kp*error + ki*integral_error + kd*devirative_error); // PID Control
+	if(input < 0)
+	{
+		gpio_pin_set_dt(&DIR,1);
+	}
+	else
+	{
+		gpio_pin_set_dt(&DIR,0);
+	}
+	if(Step_time_interval <= 0)
+	{
+		Step_time_interval = -Step_time_interval;
+	}
+	if(input <= 0)
+	{
+		input = -input;
+	}
+	if(input < 66.75 && input > 0.134){
+		Step_time_interval = (distance_per_step/(input*66.75/(0.10)))*pow(10,6);
+		
+	}
+	else if(input > 66.75)
+	{
+		Step_time_interval = 4; 
+	}
+	else if(input < 0.134)
+	{
+		Step_time_interval = 2000; 
+	}
+	//printf("Step Period: %f,Error: %f,Input: %f,Theta: %f,Phi:%f,Psi:%f\n",Step_time_interval,error,input,theta,phi,psi);
+	//printf("Input: %f,Theta:%f,\n",input,phi);
+	
+	
+	//printf("Step Period: %f,Theta: %f,Phi:%f,Psi:%f\n",Step_time_interval,theta,phi,psi);
+	//t++;
+}
+K_WORK_DEFINE(my_work, my_work_handler);
+
+void my_timer_handler(struct k_timer *timer_id)
+{
+	k_work_submit(&my_work);
+}
+K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
 
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
@@ -183,7 +259,6 @@ static void on_percentage_request(struct percentageStruct percent) {
   LOG_INF("Percentage request callback");
 }
 
-struct encoderMessage currentEncode = {};
 static void on_encoder_request(struct encoderMessage encode) {
   //LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
   //LOG_DBG("Encoder request callback!");
@@ -191,7 +266,6 @@ static void on_encoder_request(struct encoderMessage encode) {
     LOG_INF("Dropped 1!");
   }
   currentEncode = encode;
-  newMessage = true;
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
@@ -199,32 +273,6 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 #endif
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
-
-double per_c = 0;
-float oldySteps = 0;
-float yTargetSteps = 2000;
-float ySpeed = 0;
-float ierr = 0;
-int dir = 1;
-double a = 0;
-double accel = 0;
-double delta_phi = delta_phi_start;
-double placeholder = 0;
-double flip = 0;
-int notMovingCounter = 0;
-uint32_t uptime = 0;
-uint32_t oldtime = 0;
-uint32_t collectTimeDone = 0;
-float ySteps = 0;
-bool firstTimeAchieve = true;
-bool printNow = false;
-
-float kP = 10.0*pi/3000.0;
-float kD = -900;
-float kI = 10.0/1000.0;
-
-float Poss[100];
-int possi = 0;
 
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
@@ -250,7 +298,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-   printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.position);
+   //printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.position);
    mainloop = true;
     // struct encoderMessage example = {.position = 3000,
     //   .messageNum=0,.velocity=20};
@@ -258,31 +306,6 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   }
 #endif
 }
-
-void my_work_handler(struct k_work *work)
-{
-	if(possi < 100){
-		Poss[possi] = ySteps;
-	}
-	possi++;
-	if(0*possi > 30){
-		//yTargetSteps = 3000 - yTargetSteps;
-		//firstTimeAchieve = true;
-		printNow = true;
-		possi = 0;
-		printf("Changing to target %f\n",yTargetSteps);
-		ierr = 0;
-		ySpeed = 0;
-		per_c = 0.1;
-	}
-}
-K_WORK_DEFINE(my_work, my_work_handler);
-
-void my_timer_handler(struct k_timer *timer_id)
-{
-	k_work_submit(&my_work);
-}
-K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
 
 // static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 //   uint32_t buttons = button_state & has_changed;
@@ -348,74 +371,15 @@ void main(void)
   LOG_DBG("Passed client start in main!");
 #endif /* ifdef CLIENT */
 #ifdef IMU
-  ICM20600_startup();
+  //ICM20600_startup();
 #endif /* ifdef IMU */
 #ifdef ENCODER
   Setup_interrupt();
 #endif /* ifdef ENCODER */
 
-	uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
-	uint32_t scalar = 1U;
-	per_c = period/1000000000.0;  //ns to s
-	//float ySteps = 0;
-	// float oldySteps = 0;
-	// float yTargetSteps = 1500;
-	// float ySpeed = 0;
-	// float ierr = 0;
-	//int ret;
-	// int dir = 1;
-	// double a = 0;
-	// double accel = 0;
-	// double delta_phi = delta_phi_start;
-	// double placeholder = period;
-	// double flip = 0;
-	// int notMovingCounter = 0;
-	// uint32_t uptime = k_uptime_ticks();
-	// uint32_t oldtime = 0;
-	printk("Uptime is %u\n",uptime);
-
-	// ret = dk_buttons_init(on_button_changed);
-	// if (ret) {
-	// 	LOG_ERR("Cannot init buttons (error: %d)", ret);
-	// 	goto end;
-	// }
-	// float buf[arraySize];
-	// int bufindex = 0;
-	// size_t timesFull = 0;
-	// struct flash_pages_info pginf;
-
 	if (!device_is_ready(P0)) {
 		return;
 	}
-
-	ret = gpio_pin_configure(P0, step_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, dir_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, mode2_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, mode1_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, mode0_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	gpio_pin_set(P0, mode2_pin, 0);
-	gpio_pin_set(P0, mode1_pin, 0);
-	gpio_pin_set(P0, mode0_pin, 0);
 
 	// ret = flash_get_page_info_by_offs(flashmem, addrs, &pginf);
 	
@@ -423,214 +387,30 @@ void main(void)
 	// ret = flash_erase(flashmem, addrs, pginf.size*maxPages);
 	// printf("erase ret %d\n",ret);
 
-	printk("Control Wirelessly Correct\n");
-	k_sleep(K_NSEC(4000U*1000U*1000U));
+	printk("IMU Wirelessly Correct\n");
+	k_sleep(K_NSEC(2000U*1000U*1000U));
 
 	while(!mainloop){
 		k_sleep(K_NSEC(20000U));
 	}
 
-	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(80));
-	uptime = k_uptime_ticks();
-	printk("Uptime is %u\n",uptime);
-
+	k_timer_start(&my_timer, K_SECONDS(0), K_MSEC(Sampling_period));
 	while (1) {		
-		delta_phi = delta_phi_start/scalar;
-		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
-
-		if( ( (yTargetSteps-3 <= ySteps) && (ySteps < yTargetSteps+3) && (per_c > 0.001) ) && firstTimeAchieve){
-			printf("Time has been done\n");
-			if(possi < 100){
-			Poss[possi] = 0;
-			}
-			possi++;
-			collectTimeDone = uptime;
-			firstTimeAchieve = false;
-			goto toend;
+		if(Step_time_interval<10000 && Step_time_interval>4)
+		{
+			gpio_pin_set_dt(&STEP,1);
+			k_sleep(K_USEC(Step_time_interval));
+			gpio_pin_set_dt(&STEP,0);
+			k_sleep(K_USEC(Step_time_interval));
 		}
-
-		if((uptime - collectTimeDone > 32876*15) && !firstTimeAchieve){
-			goto toend;
-		}
-
-		if(notMovingCounter> 100 && (ySteps + dir*3<3000)){
-			for(int i = 0; i<3; i++){
-				gpio_pin_set(P0, step_pin, 1);
-
-				k_sleep(K_MSEC(10));
-
-				gpio_pin_set(P0, step_pin, 0);
-
-				k_sleep(K_MSEC(10));
-
-				ySteps = ySteps + 3;
-
-				period = period*2;
-				per_c = per_c*2;
-			}
-		}
-
-		gpio_pin_set(P0, step_pin, 1);
-
-		k_sleep(K_NSEC(period/scalar/2U));
-
-		gpio_pin_set(P0, step_pin, 0);
-
-		k_sleep(K_NSEC(period/scalar/2U));
-
-		//ySteps = ySteps + 1.0/scalar*dir;
-	if(newMessage){
-		newMessage = false;
-		oldySteps = ySteps;
-    	ySteps = 3000.0*currentEncode.position/MAXENCODER;
-
-		if(ySteps == oldySteps){
-			notMovingCounter++;
-		}
-		else{
-			notMovingCounter = 0;
-		}
-    //ySteps = 3000.0*currentEncode.position/28800.0;
-
-		uptime = k_uptime_ticks();
-		if(uptime - oldtime > 0){
-			ySpeed = (ySteps - oldySteps)/(uptime-oldtime);
-		}
-		else{
-			ySpeed = ySteps - oldySteps;
-		}
-		oldtime = uptime;
-
-		ierr = ierr + (yTargetSteps - ySteps)/3000.0*(uptime-oldtime)/32786.0/0.1;
-		if(kI*ierr > 20)
-			ierr = 20.0/kI;
-		if(kI*ierr < -20){
-			ierr = -20.0/kI;
-		}
-
-		// if(ySpeed == 0){
-		// 	ySpeed = 10000.0;
-		// }
-	
-
-		if(flip!=0){
-			ySpeed = ySpeed/20.0;
-		}
-
-		a = kP*(yTargetSteps-ySteps) + kD*ySpeed + kI*ierr;
-
-		accel = a*dir;
-
-		if(dir == 1)
-			gpio_pin_set(P0, dir_pin, 0); //Away from motor
-
-		if(dir == -1)
-			gpio_pin_set(P0, dir_pin, 1); //Towards motor
-
-	//printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d\n",per_c,ySteps,accel,ySpeed,dir);
-	
-	// if(bufindex < arraySize){
-	// 	buf[bufindex] = ySteps;
-	// 	bufindex++;
-	// }
-	// else
-	// {
-	// 	if(timesFull*sizeof(buf)<maxPages*pginf.size){
-	// 		ret = flash_write(flashmem, addrs+sizeof(buf)*timesFull, buf, sizeof(buf));
-	// 		if(ret < 0)
-	// 			printf("write ret %d\n",ret);
-	// 		timesFull++;
-	// 		bufindex = 0;
-	// 		buf[bufindex] = ySteps;
-	// 		bufindex++;
-	// 	}
-	// }
-	 
-    if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
-    {
-		flip = 1;
-		per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) - delta_phi/accel) - delta_phi/(accel*per_c*2);
-		accel = -accel;
-		dir = -dir;
-    }
-    else {
-        if(accel > 0.01) 
-        {
-    		    per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
-    	}
-    	else
-            if(accel < -0.01)
-    		{
-    		        per_c = -sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
-    		}
-	}
-
-		placeholder = per_c*1000000000;
-		period = placeholder;
-
-		if(period*scalar < MIN_PER){
-			period = MIN_PER;
-			per_c = period/1000000000.0;
-		}
-		if(period*scalar > MAX_PER){
-			period = MAX_PER;
-			per_c = period/1000000000.0;
-			//printf("Should have theoretically stopped, per_c = %f\n",per_c);
-		}
-
-		if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
-			scalar = scalar*2U;  //gear down
-		}
-		else{
-			if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
-				scalar = scalar/2U;
-				if(scalar < 1U) scalar = 1U;
-		}
-		switch(scalar){
-			case 1U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 0);
-				break;
-			case 2U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 1);
-				break;
-			case 4U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 1);
-				gpio_pin_set(P0, mode0_pin, 0);
-				break;
-			case 8U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 1);
-				gpio_pin_set(P0, mode0_pin, 1);
-				break;
-			case 16U:
-				gpio_pin_set(P0, mode2_pin, 1);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 0);
-				break;
-			case 32U:
-				gpio_pin_set(P0, mode2_pin, 1);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 1);
-				break;
-			default:
-				//printk("Scalar is wrong\n");
-			break;
+		else if(Step_time_interval<=4)
+		{
+			gpio_pin_set_dt(&STEP,1);
+			k_sleep(K_USEC(2));
+			gpio_pin_set_dt(&STEP,0);
+			k_sleep(K_USEC(2));
 		}
 	}
-	}
-
-  toend: 
-		printf("Target Reached in %u\n", uptime);
-
-		for(int i=0; i<100; i++){
-			printf("%f\n",Poss[i]);
-		}
-		printf("Might require up to %d, rn with every 0.08\n",possi);
 
   end: return;
 }

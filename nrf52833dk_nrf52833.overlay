@@ -11,6 +11,41 @@
 // For more help, browse the DeviceTree documentation at https://docs.zephyrproject.org/latest/guides/dts/index.html
 // You can also visit the nRF DeviceTree extension documentation at https://nrfconnect.github.io/vscode-nrf-connect/devicetree/nrfdevicetree.html
 
+/{
+    aliases {
+        stepper = &StepperPin;
+        stepperdir = &StepperDir;
+        m0 = &mode0;
+        m1 = &mode1;
+        m2 = &mode2;
+    };
+    Stepper_motor {
+        compatible = "gpio-leds";
+        StepperPin: Stepper_pin {
+            gpios = < &gpio0 29 0x1>;
+            label = "Stepper Motor";
+        };
+        StepperDir: Stepper_Dir{
+            gpios = < &gpio0 30 0x1>;
+            label = "Stepper Motor direction pin";
+        };
+        mode0: mode_0{
+            gpios = < &gpio0 0 0x1>;
+            label = "Stepper Motor Mode 0";
+        };
+        mode1: mode_1{
+            gpios = < &gpio0 1 0x1>;
+            label = "Stepper Motor Mode 1";
+        };
+        mode2: mode_2{
+            gpios = < &gpio0 5 0x1>;
+            label = "Stepper Motor Mode 2";
+        };
+    };
+    
+    
+};
+
 &i2c0 {
     ICM20600: ICM20600@69 {
         compatible = "i2c-device";
