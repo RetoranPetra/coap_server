@@ -201,7 +201,7 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
 #endif
 
-const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+//const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
@@ -269,7 +269,7 @@ void my_work_handler(struct k_work *work)
 	double   ki = 0;
 	double   kd = 0.8;
 	phi = (float) currentEncode.position / 10000.0;
-	printf("We are in work handler with phi %f\n", phi);
+	//printf("We are in work handler with phi %f\n", phi);
 	//SimpleComplementaryFilter(getRawAccelerationX()*9.81/1000,getRawAccelerationY()*9.81/1000,getRawAccelerationZ()*9.81/1000,getRawGyroscopeX()*2*pi/360,getRawGyroscopeY()*2*pi/360,getRawGyroscopeZ()*2*pi/360,Sampling_period*pow(10,-3));
 	
 	//printf("Start t = %f\n", t);
@@ -310,7 +310,7 @@ void my_work_handler(struct k_work *work)
 	{
 		Step_time_interval = 2000; 
 	}
-	printf("We are in work handler with step interval %f\n", Step_time_interval);
+	//printf("We are in work handler with step interval %f\n", Step_time_interval);
 	//printf("Step Period: %f,Error: %f,Input: %f,Theta: %f,Phi:%f,Psi:%f\n",Step_time_interval,error,input,theta,phi,psi);
 	//printf("Input: %f,Theta:%f,\n",input,phi);
 	
@@ -377,15 +377,8 @@ void main(void)
   Setup_interrupt();
 #endif /* ifdef ENCODER */
 
-	if (!device_is_ready(P0)) {
-		return;
-	}
-
-	// ret = flash_get_page_info_by_offs(flashmem, addrs, &pginf);
-	
-	// printf("getinfo ret %d and offset %u, size %u and i %u with max size = %u with doubles per page = %u\n",ret, pginf.start_offset,pginf.size,pginf.index,flash_get_page_count(flashmem), pginf.size/sizeof(per_c));
-	// ret = flash_erase(flashmem, addrs, pginf.size*maxPages);
-	// printf("erase ret %d\n",ret);
+	gpio_pin_configure_dt(&STEP, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_configure_dt(&DIR, GPIO_OUTPUT_ACTIVE);
 
 	printk("IMU Wirelessly Correct\n");
 	k_sleep(K_NSEC(2000U*1000U*1000U));
@@ -395,9 +388,9 @@ void main(void)
 	}
 
 	k_timer_start(&my_timer, K_SECONDS(0), K_MSEC(Sampling_period));
-	printk("Timer Started\n");
+		printk("Timer Started\n");
 	while (1) {	
-		printk("Stepping\n");	
+		//printk("Stepping\n");	
 		if(Step_time_interval<10000 && Step_time_interval>4)
 		{
 			gpio_pin_set_dt(&STEP,1);
