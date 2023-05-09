@@ -36,7 +36,7 @@
 #include "ICM20600.h"
 #endif
 
-#define Sampling_period 1 // in milli  secs
+#define Sampling_period 10 // in milli  secs
 #define pi 3.14159265359
 #define radius 8.5E-3
 #define distance_per_step 2.0*3.14*8.5E-3/200.0
