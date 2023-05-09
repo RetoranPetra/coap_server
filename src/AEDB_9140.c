@@ -1,3 +1,5 @@
+#ifdef ENCODER
+
 #include "AEDB_9140.h"
 #include "zephyr/kernel.h"
 #include <math.h>
@@ -143,3 +145,4 @@ void encoderTestLoop(void) {
     }
   }
 }
+#endif

@@ -21,3 +21,4 @@ target_include_directories(app PRIVATE interface)
 # Caleb's secret nvim sauce
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # NORDIC SDK APP END
+target_sources(app PRIVATE src/ICM20600.h)

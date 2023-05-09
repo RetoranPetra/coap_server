@@ -8,8 +8,8 @@
 #include "coap_server_client_interface.h"
 #define CLIENT
 #define SERVER
-//#define IMU
-#define ENCODER
+#define IMU
+//#define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
@@ -30,14 +30,36 @@
 
 // Control modules
 #ifdef ENCODER
-#include "AEDB_9140.h"
+//#include "AEDB_9140.h"
 #endif
 #ifdef IMU
-#include "imu.h"
+#include "ICM20600.h"
 #endif
 
-LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
+#define Sampling_period 1 // in milli  secs
+#define pi 3.14159265359
+#define radius 8.5E-3
+#define distance_per_step 2.0*3.14*8.5E-3/200.0
 
+#define Stepper_Pin DT_ALIAS(stepper)
+#define Direction_pin DT_ALIAS(stepperdir)
+#define M0_Pin DT_ALIAS(m0)
+#define M1_Pin DT_ALIAS(m1)
+#define M2_Pin DT_ALIAS(m2)
+
+float phiToSend = 0;
+
+static const struct gpio_dt_spec STEP = GPIO_DT_SPEC_GET(Stepper_Pin, gpios);
+static const struct gpio_dt_spec DIR = GPIO_DT_SPEC_GET(Direction_pin, gpios);
+static const struct gpio_dt_spec M0 = GPIO_DT_SPEC_GET(M0_Pin, gpios);
+static const struct gpio_dt_spec M1 = GPIO_DT_SPEC_GET(M1_Pin, gpios);
+static const struct gpio_dt_spec M2 = GPIO_DT_SPEC_GET(M2_Pin, gpios);
+
+double Step_time_interval;
+
+double   Vm = 0;
+
+LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -206,10 +228,13 @@ start:
     k_msleep(500);
   }
   while (1) {
-    k_msleep(6);
-    struct encoderMessage out = {.position = getPosition(),.messageNum=0,.velocity=getIntVel()};
+    k_msleep(Sampling_period);
+	SimpleComplementaryFilter(getRawAccelerationX()*9.81/1000,getRawAccelerationY()*9.81/1000,getRawAccelerationZ()*9.81/1000,getRawGyroscopeX()*2*pi/360,getRawGyroscopeY()*2*pi/360,getRawGyroscopeZ()*2*pi/360,Sampling_period*pow(10,-3));
+	phiToSend = phi;
+    struct encoderMessage out = {.position = phiToSend,.messageNum=0,.velocity=0};
     //LOG_DBG("Position:%i",out.position);
     coap_client_encoderSend(out);
+	
   }
 
 
@@ -257,7 +282,17 @@ setup:
   LOG_DBG("Passed client start in main!");
 #endif /* ifdef CLIENT */
 #ifdef IMU
-  ICM20600_startup();
+ 	gpio_pin_configure_dt(&STEP, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_configure_dt(&DIR, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_configure_dt(&M0,GPIO_OUTPUT_INACTIVE);
+	gpio_pin_configure_dt(&M1,GPIO_OUTPUT_INACTIVE);
+	gpio_pin_configure_dt(&M2,GPIO_OUTPUT_INACTIVE);
+	ICM20600_startup();
+    //printf("Temperature: %d",getTemperature());
+    //k_timer_start(&my_timer, K_SECONDS(0), K_MSEC(Sampling_period));
+	gpio_pin_set_dt(&M0,0);
+	gpio_pin_set_dt(&M1,0);
+	gpio_pin_set_dt(&M2,0);
 #endif /* ifdef IMU */
 #ifdef ENCODER
   Setup_interrupt();
