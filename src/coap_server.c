@@ -8,10 +8,8 @@
 #include "coap_server_client_interface.h"
 #define CLIENT
 #define SERVER
-#define CLIENT
-#define SERVER
 //#define IMU
-#define ENCODER
+//#define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
@@ -193,7 +191,7 @@ static void on_encoder_request(struct encoderMessage encode) {
   //LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
   //LOG_DBG("Encoder request callback!");
   if (currentEncode.messageNum + 1 != encode.messageNum) {
-    LOG_INF("Dropped 1!");
+    LOG_INF("Dropped %d!", encode.messageNum - currentEncode.messageNum + 1);
   }
   currentEncode = encode;
   newMessage = true;
@@ -224,8 +222,8 @@ float ySteps = 0;
 bool firstTimeAchieve = true;
 bool printNow = false;
 
-float kP = 10.0*pi/3000.0;
-float kD = -900;
+float kP = 20.0*pi/3000.0;
+float kD = -1050;
 float kI = 10.0/1000.0;
 
 float Poss[maxRecord];
@@ -266,12 +264,12 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 
 void my_work_handler(struct k_work *work)
 {
-	if(!inPrinting){
+	if(!printNow){
 		if(possi < maxRecord){
 			Poss[possi] = ySteps;
 		}
 		possi++;
-		if(readFreq*possi > switchTime && !printNow){
+		if(readFreq*possi > switchTime){
 			//yTargetSteps = 3000 - yTargetSteps;
 			//firstTimeAchieve = true;
 			//possi = 0;
@@ -447,8 +445,7 @@ void main(void)
 	while (1) {		
 		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
 
-		if( ( ((yTargetSteps-2 <= ySteps) && (ySteps < yTargetSteps+2) && (per_c > 0.1) ) && firstTimeAchieve) || printNow){
-			inPrinting = true;
+		if(printNow){//( ((yTargetSteps-2 <= ySteps) && (ySteps < yTargetSteps+2) && (per_c > 0.1) ) && firstTimeAchieve) || printNow){
 			// printf("Time has been done\n");
 			// if(possi < maxRecord){
 			// Poss[possi] = 0;
@@ -459,12 +456,11 @@ void main(void)
 				printf("%f\n",Poss[i]);
 			}
 			possi = 0;
-			firstTimeAchieve = false;
+			//firstTimeAchieve = false;
 			printNow = false;
-			inPrinting = false;
-			while((yTargetSteps-2 <= ySteps) && (ySteps < yTargetSteps+2)){
-				printf("I think i am at the target");
-			}
+			// while((yTargetSteps-2 <= ySteps) && (ySteps < yTargetSteps+2)){
+			// 	printf("Printnow = %d and target = %f",printNow,yTargetSteps);
+			// }
 			//goto toend;
 		}
 
