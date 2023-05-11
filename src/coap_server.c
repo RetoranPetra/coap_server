@@ -146,7 +146,8 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .messageNum=0,.velocity=20};
     coap_client_encoderSend(example);
     */
-    LOG_DBG("Start main loop!");
+    //LOG_DBG("Start main loop!");
+	printf("Encpos = %i\n",getPosition());
     mainloop = true;
   }
 #endif
@@ -198,6 +199,7 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 #endif
 
 void main(void) {
+	int delay;
   goto setup;
 start:
   LOG_INF("START!");
@@ -206,8 +208,13 @@ start:
     k_msleep(500);
   }
   while (1) {
-    k_msleep(10);
+	delay = k_uptime_ticks()%90;
+	if(k_uptime_ticks()%15 == 1){
+		k_msleep(200);
+	}
+    k_msleep(10 + delay);
     struct encoderMessage out = {.position = getPosition(),.messageNum=0,.velocity=getIntVel()};
+	//printk("%i\n",out.position);
     //LOG_DBG("Position:%i",out.position);
     coap_client_encoderSend(out);
   }
