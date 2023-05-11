@@ -63,8 +63,12 @@
 #define maxPages 6//16//
 #define arraySize 20
 
+#define readFreq 80  //in ms
+#define switchTime 5000 //in ms
+
 bool mainloop = false;
 bool newMessage = false;
+bool inPrinting = false;
 
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
@@ -262,19 +266,23 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 
 void my_work_handler(struct k_work *work)
 {
-	if(possi < maxRecord){
-		Poss[possi] = ySteps;
-	}
-	possi++;
-	if(0*possi > 30){
-		//yTargetSteps = 3000 - yTargetSteps;
-		//firstTimeAchieve = true;
-		printNow = true;
-		possi = 0;
-		printf("Changing to target %f\n",yTargetSteps);
-		ierr = 0;
-		ySpeed = 0;
-		per_c = 0.1;
+	if(!inPrinting){
+		if(possi < maxRecord){
+			Poss[possi] = ySteps;
+		}
+		possi++;
+		if(readFreq*possi > switchTime && !printNow){
+			//yTargetSteps = 3000 - yTargetSteps;
+			//firstTimeAchieve = true;
+			//possi = 0;
+			//firstTimeAchieve = true;
+			printNow = true;
+			yTargetSteps = -yTargetSteps;
+			//printf("Changing to target %f\n",yTargetSteps);
+			ierr = 0;
+			ySpeed = 0;
+			per_c = 1;
+		}
 	}
 }
 K_WORK_DEFINE(my_work, my_work_handler);
@@ -425,34 +433,46 @@ void main(void)
 	// printf("erase ret %d\n",ret);
 
 	printk("Control Wirelessly Correct\n");
-	k_sleep(K_NSEC(4000U*1000U*1000U));
+	printf("Reading every %d and switching targets every %d\n",readFreq, switchTime);
+	k_sleep(K_NSEC(2000U*1000U*1000U));
 
 	while(!mainloop){
 		k_sleep(K_NSEC(20000U));
 	}
 
-	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(80));
+	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(readFreq));
 	uptime = k_uptime_ticks();
 	printk("Uptime is %u\n",uptime);
 
 	while (1) {		
-		delta_phi = delta_phi_start/scalar;
 		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
 
-		if( ( (yTargetSteps-3 <= ySteps) && (ySteps < yTargetSteps+3) && (per_c > 0.1) ) && firstTimeAchieve){
-			printf("Time has been done\n");
-			if(possi < maxRecord){
-			Poss[possi] = 0;
+		if( ( ((yTargetSteps-2 <= ySteps) && (ySteps < yTargetSteps+2) && (per_c > 0.1) ) && firstTimeAchieve) || printNow){
+			inPrinting = true;
+			// printf("Time has been done\n");
+			// if(possi < maxRecord){
+			// Poss[possi] = 0;
+			// }
+			// possi++;
+			// collectTimeDone = uptime;
+			for(int i=0; i<maxRecord && i<possi; i++){
+				printf("%f\n",Poss[i]);
 			}
-			possi++;
-			collectTimeDone = uptime;
+			possi = 0;
 			firstTimeAchieve = false;
+			printNow = false;
+			inPrinting = false;
+			while((yTargetSteps-2 <= ySteps) && (ySteps < yTargetSteps+2)){
+				printf("I think i am at the target");
+			}
 			//goto toend;
 		}
 
-		if((k_ticks_to_ms_floor32(uptime - collectTimeDone)> 10000) && !firstTimeAchieve){
-			goto toend;
-		}
+		delta_phi = delta_phi_start/scalar;
+
+		// if((k_ticks_to_ms_floor32(uptime - collectTimeDone)> 10000) && !firstTimeAchieve){
+		// 	goto toend;
+		// }
 
 		if(notMovingCounter> 100 && (ySteps + dir*3<3000)){
 			for(int i = 0; i<3; i++){
@@ -483,7 +503,7 @@ void main(void)
 	//if(newMessage){
 		newMessage = false;
 		oldySteps = ySteps;
-    	ySteps = 3000.0*getPosition()/MAXENCODER;//*currentEncode.position/MAXENCODER;
+    	ySteps = 3000.0*currentEncode.position/MAXENCODER;//*getPosition()/MAXENCODER;//
 
 		if(ySteps == oldySteps){
 			notMovingCounter++;
@@ -491,7 +511,6 @@ void main(void)
 		else{
 			notMovingCounter = 0;
 		}
-    //ySteps = 3000.0*currentEncode.position/28800.0;
 
 		uptime = k_uptime_ticks();
 		if(uptime - oldtime > 0){
@@ -629,7 +648,7 @@ void main(void)
   toend: 
 		printf("Target Reached in %u\n", uptime);
 
-		for(int i=0; i<maxRecord; i++){
+		for(int i=0; i<maxRecord && i<possi; i++){
 			printf("%f\n",Poss[i]);
 		}
 		printf("Might require up to %d, rn with every 0.08\n",possi);
