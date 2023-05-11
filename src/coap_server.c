@@ -61,9 +61,11 @@
 #define notusable 0x9C7B
 #define maxPages 6//16//
 #define arraySize 20
+#define currentOffset -0.00041
 
 bool mainloop = false;
 bool newMessage = false;
+bool manualStop = false;;
 
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
@@ -200,11 +202,13 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
+uint32_t scalar = 1U;
 double per_c = 0;
 float oldySteps = 0;
 float yTargetSteps = 2000;
 float ySpeed = 0;
 float ierr = 0;
+float dererr = 0;
 int dir = 1;
 double a = 0;
 double accel = 0;
@@ -219,11 +223,21 @@ float ySteps = 0;
 bool firstTimeAchieve = true;
 bool printNow = false;
 
-float kP = 10.0*pi/3000.0;
-float kD = -900;
-float kI = 10.0/1000.0;
+float rxth = 0;
+float angle = 0;
+float kp = 1;
+float ki = 15;
+float kd = -0.15;
+float oldrx = 0;
+float slow = 1;
+int angleCount = 0;
+bool shouldStep = false;
 
-float Poss[100];
+// float kP = 10.0*pi/3000.0;
+// float kD = -900;
+// float kI = 10.0/1000.0;
+
+float Poss[300];
 int possi = 0;
 
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
@@ -236,6 +250,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 #ifdef CLIENT
   if (buttons & DK_BTN3_MSK) {
     // Should toggle through server selected.
+	manualStop = true;
     serverScroll();
   }
   if (buttons & DK_BTN2_MSK) {
@@ -250,7 +265,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-   printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.position);
+   printf("per_c = %f, ySteps = %f,p %f, i %f, d %f, dir %d, scalar %u, encpos = %i\n",per_c,angle,kp*ySteps, ki*ierr, kd*dererr,dir, scalar,currentEncode.position);
    mainloop = true;
     // struct encoderMessage example = {.position = 3000,
     //   .messageNum=0,.velocity=20};
@@ -261,7 +276,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 
 void my_work_handler(struct k_work *work)
 {
-	if(possi < 100){
+	if(possi < 300){
 		Poss[possi] = ySteps;
 	}
 	possi++;
@@ -355,8 +370,8 @@ void main(void)
 #endif /* ifdef ENCODER */
 
 	uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
-	uint32_t scalar = 1U;
 	per_c = period/1000000000.0;  //ns to s
+	int olddir = dir;
 	//float ySteps = 0;
 	// float oldySteps = 0;
 	// float yTargetSteps = 1500;
@@ -430,96 +445,112 @@ void main(void)
 		k_sleep(K_NSEC(20000U));
 	}
 
-	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(80));
+	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(100));
 	uptime = k_uptime_ticks();
 	printk("Uptime is %u\n",uptime);
 
-	while (1) {		
-		delta_phi = delta_phi_start/scalar;
-		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
+	while (1) {	
 
-		if( ( (yTargetSteps-3 <= ySteps) && (ySteps < yTargetSteps+3) && (per_c > 0.001) ) && firstTimeAchieve){
-			printf("Time has been done\n");
-			if(possi < 100){
-			Poss[possi] = 0;
-			}
-			possi++;
-			collectTimeDone = uptime;
-			firstTimeAchieve = false;
+		if(manualStop){
 			goto toend;
 		}
 
-		if((uptime - collectTimeDone > 32876*15) && !firstTimeAchieve){
-			goto toend;
+		//delta_phi = delta_phi_start/scalar;
+
+		if(shouldStep){
+
+			gpio_pin_set(P0, step_pin, 1);
+
+			k_sleep(K_NSEC(period/scalar/2U));
+
+			gpio_pin_set(P0, step_pin, 0);
+
+			k_sleep(K_NSEC(period/scalar/2U));
 		}
+		// if(uptime - oldtime > 0){
+		// 	ySpeed = (ySteps - oldySteps)/(uptime-oldtime);
+		// }
+		// else{
+		// 	ySpeed = ySteps - oldySteps;
+		// }
+		// oldtime = uptime;
 
-		if(notMovingCounter> 100 && (ySteps + dir*3<3000)){
-			for(int i = 0; i<3; i++){
-				gpio_pin_set(P0, step_pin, 1);
+		// ierr = ierr + (yTargetSteps - ySteps)/3000.0*(uptime-oldtime)/32786.0/0.1;
 
-				k_sleep(K_MSEC(10));
+		rxth = (float) currentEncode.position/10000.0 - currentOffset;
 
-				gpio_pin_set(P0, step_pin, 0);
+		ySteps = rxth;
+		
 
-				k_sleep(K_MSEC(10));
-
-				ySteps = ySteps + 3;
-
-				period = period*2;
-				per_c = per_c*2;
-			}
-		}
-
-		gpio_pin_set(P0, step_pin, 1);
-
-		k_sleep(K_NSEC(period/scalar/2U));
-
-		gpio_pin_set(P0, step_pin, 0);
-
-		k_sleep(K_NSEC(period/scalar/2U));
-
-		//ySteps = ySteps + 1.0/scalar*dir;
-	if(newMessage){
-		newMessage = false;
-		oldySteps = ySteps;
-    	ySteps = 3000.0*currentEncode.position/MAXENCODER;
-
-		if(ySteps == oldySteps){
-			notMovingCounter++;
-		}
-		else{
-			notMovingCounter = 0;
-		}
-    //ySteps = 3000.0*currentEncode.position/28800.0;
-
+		if(newMessage){
 		uptime = k_uptime_ticks();
 		if(uptime - oldtime > 0){
-			ySpeed = (ySteps - oldySteps)/(uptime-oldtime);
+			dererr = (rxth - oldrx)/(uptime-oldtime)*32786;
 		}
 		else{
-			ySpeed = ySteps - oldySteps;
+			dererr = (rxth - oldrx)/0.1;
 		}
+		ierr = ierr*0.85 + rxth*(uptime-oldtime)/32786.0;
+
+		if(ierr > 20)
+			ierr = 20;
+		if(ierr < -20)
+			ierr = -20;
+		if(dererr > 80)
+			dererr = 80;
+		if(dererr < -80)
+			dererr = -80;
+
 		oldtime = uptime;
+		oldrx = rxth;
+		newMessage = false;
 
-		ierr = ierr + (yTargetSteps - ySteps)/3000.0*(uptime-oldtime)/32786.0/0.1;
-		if(kI*ierr > 20)
-			ierr = 20.0/kI;
-		if(kI*ierr < -20){
-			ierr = -20.0/kI;
+		if(fabs(angle) < 9.9){//fabs(rxth) < 1 ){
+			angleCount++;
+			if(angleCount > 100){
+				goto toend;
+			}
+		}
+		else{
+			angleCount = 0;
+		}
 		}
 
-		// if(ySpeed == 0){
-		// 	ySpeed = 10000.0;
-		// }
-	
+		angle = kp*rxth + ki*ierr + kd*dererr;
 
-		if(flip!=0){
-			ySpeed = ySpeed/20.0;
+
+		olddir = dir;
+		if(fabs(angle) > 5){
+			shouldStep = true;
+		}
+		else{
+			shouldStep = false;
 		}
 
-		a = kP*(yTargetSteps-ySteps) + kD*ySpeed + kI*ierr;
+		if(rxth > 0){
+			dir = 1;
+		}
+		if(rxth < 0){
+			dir = -1;
+		}
 
-		accel = a*dir;
+		if(fabs(angle) < 12)
+			slow = -1;
+		else
+			slow = 1;
+
+
+		per_c = delta_phi_start/(delta_phi_start/per_c + slow*fabs(angle)/10.0);
+		if(olddir != dir){
+			per_c = 2*per_c;
+			// for(int i=0; i<possi && i<100; i++){
+			// 	printf("%f\n",Poss[i]);
+			// }
+			// possi = 0;
+		}
+
+		placeholder = per_c*1000000000;
+		period = placeholder;
 
 		if(dir == 1)
 			gpio_pin_set(P0, dir_pin, 0); //Away from motor
@@ -546,27 +577,27 @@ void main(void)
 	// 	}
 	// }
 	 
-    if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
-    {
-		flip = 1;
-		per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) - delta_phi/accel) - delta_phi/(accel*per_c*2);
-		accel = -accel;
-		dir = -dir;
-    }
-    else {
-        if(accel > 0.01) 
-        {
-    		    per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
-    	}
-    	else
-            if(accel < -0.01)
-    		{
-    		        per_c = -sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
-    		}
-	}
+    // if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
+    // {
+	// 	flip = 1;
+	// 	per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) - delta_phi/accel) - delta_phi/(accel*per_c*2);
+	// 	accel = -accel;
+	// 	dir = -dir;
+    // }
+    // else {
+    //     if(accel > 0.01) 
+    //     {
+    // 		    per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
+    // 	}
+    // 	else
+    //         if(accel < -0.01)
+    // 		{
+    // 		        per_c = -sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
+    // 		}
+	// }
 
-		placeholder = per_c*1000000000;
-		period = placeholder;
+	// 	placeholder = per_c*1000000000;
+	// 	period = placeholder;
 
 		if(period*scalar < MIN_PER){
 			period = MIN_PER;
@@ -622,15 +653,15 @@ void main(void)
 			break;
 		}
 	}
+	//}
+
+  toend:
+  	printf("Target Reached in %u\n", uptime);
+
+	for(int i=0; i<300; i++){
+		printf("%f\n",Poss[i]);
 	}
-
-  toend: 
-		printf("Target Reached in %u\n", uptime);
-
-		for(int i=0; i<100; i++){
-			printf("%f\n",Poss[i]);
-		}
-		printf("Might require up to %d, rn with every 0.08\n",possi);
+	printf("Might require up to %d, rn with every 0.1\n",possi); 
 
   end: return;
 }
