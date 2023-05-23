@@ -58,7 +58,6 @@ struct encoderMessage {
 #define PERCENTAGE_URI_PATH "percentage"
 #define PERCENTAGE_PAYLOAD_SIZE sizeof(struct percentageStructHidden) //Should be 120.
 
-#define SERVERS 3
-#define CLIENTS 1
+#define SERVERS 6
 
 #endif

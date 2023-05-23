@@ -54,8 +54,8 @@ static const char *const light_option[] = {LIGHT_URI_PATH, NULL};
 static const char *const provisioning_option[] = {PROVISIONING_URI_PATH, NULL};
 static const char *const generic_option[] = {GENERIC_URI_PATH, NULL};
 static const char *const float_option[] = {FLOAT_URI_PATH, NULL};
-static const char *const percentage_option[] = {PERCENTAGE_URI_PATH,NULL};
-static const char *const encoder_option[] = {ENCODER_URI_PATH,NULL};
+static const char *const percentage_option[] = {PERCENTAGE_URI_PATH, NULL};
+static const char *const encoder_option[] = {ENCODER_URI_PATH, NULL};
 
 /* Thread multicast mesh local address */
 static struct sockaddr_in6 multicast_local_addr = {
@@ -68,6 +68,27 @@ static struct sockaddr_in6 multicast_local_addr = {
 /* Variable for storing server address acquiring in provisioning handshake */
 static char unique_local_addr_str[SERVERS][INET6_ADDRSTRLEN];
 static struct sockaddr_in6 unique_local_addr[SERVERS] = {
+    {.sin6_family = AF_INET6,
+     .sin6_port = htons(COAP_PORT),
+     .sin6_addr.s6_addr =
+         {
+             0,
+         },
+     .sin6_scope_id = 0U},
+    {.sin6_family = AF_INET6,
+     .sin6_port = htons(COAP_PORT),
+     .sin6_addr.s6_addr =
+         {
+             0,
+         },
+     .sin6_scope_id = 0U},
+    {.sin6_family = AF_INET6,
+     .sin6_port = htons(COAP_PORT),
+     .sin6_addr.s6_addr =
+         {
+             0,
+         },
+     .sin6_scope_id = 0U},
     {.sin6_family = AF_INET6,
      .sin6_port = htons(COAP_PORT),
      .sin6_addr.s6_addr =
@@ -307,18 +328,23 @@ static void percentageSend(struct k_work *item) {
   if (coap_send_request(
           COAP_METHOD_PUT,
           (const struct sockaddr *)&unique_local_addr[serverSelector],
-          percentage_option, (char *)percentagePointer, PERCENTAGE_PAYLOAD_SIZE, NULL) >= 0) {
-    LOG_DBG("Percentage message send success!\n%s", percentagePointer->identifier);
+          percentage_option, (char *)percentagePointer, PERCENTAGE_PAYLOAD_SIZE,
+          NULL) >= 0) {
+    LOG_DBG("Percentage message send success!\n%s",
+            percentagePointer->identifier);
   } else {
     LOG_DBG("Percentage message send fail.\n%s", percentagePointer->identifier);
   }
 }
 static void encoderSend(struct k_work *item) {
   ARG_UNUSED(item);
-  if (coap_send_request(COAP_METHOD_PUT, (const struct sockaddr *)&unique_local_addr[serverSelector], encoder_option, (char*)encoderPointer, ENCODER_PAYLOAD_SIZE, NULL) >= 0) {
+  if (coap_send_request(
+          COAP_METHOD_PUT,
+          (const struct sockaddr *)&unique_local_addr[serverSelector],
+          encoder_option, (char *)encoderPointer, ENCODER_PAYLOAD_SIZE,
+          NULL) >= 0) {
     LOG_DBG("Encoder message send success!\n");
-  }
-  else {
+  } else {
     LOG_DBG("Encoder message send fail!\n");
   }
 }
@@ -352,8 +378,8 @@ void coap_client_utils_init(/*
 
   k_work_init(&genericSend_work, genericSend);
   k_work_init(&floatSend_work, floatSend);
-  k_work_init(&percentageSend_work,percentageSend);
-  k_work_init(&encoderSend_work,encoderSend);
+  k_work_init(&percentageSend_work, percentageSend);
+  k_work_init(&encoderSend_work, encoderSend);
 
   // openthread_state_changed_cb_register(openthread_get_default_context(),
   // &ot_state_chaged_cb); openthread_start(openthread_get_default_context());
@@ -395,8 +421,9 @@ void coap_client_toggle_minimal_sleepy_end_device(void) {
 }
 void coap_client_percentageSend(struct percentageStruct input) {
   static uint16_t counter = 0;
-  for (int i = 0;i<3;i++) {
-    percentagePointer->percentages[i] = input.percentages[i] * (double)4294967295;
+  for (int i = 0; i < 3; i++) {
+    percentagePointer->percentages[i] =
+        input.percentages[i] * (double)4294967295;
   }
   memcpy(&percentagePointer->identifier, &input.identifier, 8);
   counter++;
