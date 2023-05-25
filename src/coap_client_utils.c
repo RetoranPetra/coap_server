@@ -22,6 +22,7 @@ LOG_MODULE_REGISTER(coap_client_utils, CONFIG_COAP_CLIENT_UTILS_LOG_LEVEL);
 #define RESPONSE_POLL_PERIOD 100
 
 static int serverSelector = 0;
+static int serverTarget = 0;
 
 static uint32_t poll_period;
 
@@ -298,11 +299,11 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 static void genericSend(struct k_work *item) {
   ARG_UNUSED(item);
 
-  LOG_DBG("Generic send to %s", unique_local_addr_str[serverSelector]);
+  LOG_DBG("Generic send to %s", unique_local_addr_str[serverTarget]);
 
   if (coap_send_request(
           COAP_METHOD_PUT,
-          (const struct sockaddr *)&unique_local_addr[serverSelector],
+          (const struct sockaddr *)&unique_local_addr[serverTarget],
           generic_option, messagePointer, GENERIC_PAYLOAD_SIZE, NULL) >= 0) {
 
     LOG_DBG("Generic message send success!\n%s", messagePointer);
@@ -312,10 +313,10 @@ static void genericSend(struct k_work *item) {
 }
 static void floatSend(struct k_work *item) {
   ARG_UNUSED(item);
-  LOG_DBG("Float send to %s", unique_local_addr_str[serverSelector]);
+  LOG_DBG("Float send to %s", unique_local_addr_str[serverTarget]);
   if (coap_send_request(
           COAP_METHOD_PUT,
-          (const struct sockaddr *)&unique_local_addr[serverSelector],
+          (const struct sockaddr *)&unique_local_addr[serverTarget],
           float_option, (char *)floatPointer, sizeof(double), NULL) >= 0) {
 
     LOG_DBG("Float message send success!\n%.3f", *floatPointer);
@@ -327,7 +328,7 @@ static void percentageSend(struct k_work *item) {
   ARG_UNUSED(item);
   if (coap_send_request(
           COAP_METHOD_PUT,
-          (const struct sockaddr *)&unique_local_addr[serverSelector],
+          (const struct sockaddr *)&unique_local_addr[serverTarget],
           percentage_option, (char *)percentagePointer, PERCENTAGE_PAYLOAD_SIZE,
           NULL) >= 0) {
     LOG_DBG("Percentage message send success!\n%s",
@@ -340,7 +341,7 @@ static void encoderSend(struct k_work *item) {
   ARG_UNUSED(item);
   if (coap_send_request(
           COAP_METHOD_PUT,
-          (const struct sockaddr *)&unique_local_addr[serverSelector],
+          (const struct sockaddr *)&unique_local_addr[serverTarget],
           encoder_option, (char *)encoderPointer, ENCODER_PAYLOAD_SIZE,
           NULL) >= 0) {
     LOG_DBG("Encoder message send success!\n");
@@ -351,7 +352,8 @@ static void encoderSend(struct k_work *item) {
 // m/
 
 static void submit_work_if_connected(struct k_work *work) {
-  if (is_connected) {
+//  if (is_connected[serverTarget]) {
+  if (true) {
     k_work_submit(work);
   } else {
     LOG_INF("Connection is broken");
@@ -401,16 +403,18 @@ void coap_client_toggle_mesh_lights(void) {
 }
 
 void coap_client_send_provisioning_request(void) {
-  submit_work_if_connected(&provisioning_work);
+  k_work_submit(&provisioning_work);
 }
 
-void coap_client_genericSend(char *msg) {
+void coap_client_genericSend(int server,char *msg) {
   memcpy(messagePointer, msg, GENERIC_PAYLOAD_SIZE);
+  serverTarget = server;
   submit_work_if_connected(&genericSend_work);
 }
 
-void coap_client_floatSend(double num) {
+void coap_client_floatSend(int server,double num) {
   memcpy(floatPointer, &num, sizeof(double));
+  serverTarget = server;
   submit_work_if_connected(&floatSend_work);
 }
 
@@ -419,7 +423,7 @@ void coap_client_toggle_minimal_sleepy_end_device(void) {
     k_work_submit(&toggle_MTD_SED_work);
   }
 }
-void coap_client_percentageSend(struct percentageStruct input) {
+void coap_client_percentageSend(int server,struct percentageStruct input) {
   static uint16_t counter = 0;
   for (int i = 0; i < 3; i++) {
     percentagePointer->percentages[i] =
@@ -427,12 +431,14 @@ void coap_client_percentageSend(struct percentageStruct input) {
   }
   memcpy(&percentagePointer->identifier, &input.identifier, 8);
   counter++;
+  serverTarget = server;
   submit_work_if_connected(&percentageSend_work);
 }
-void coap_client_encoderSend(struct encoderMessage input) {
+void coap_client_encoderSend(int server,struct encoderMessage input) {
   static uint16_t counter = 0;
   memcpy(encoderPointer, &input, ENCODER_PAYLOAD_SIZE);
   encoderPointer->messageNum = counter;
   counter++;
+  serverTarget = server;
   submit_work_if_connected(&encoderSend_work);
 }

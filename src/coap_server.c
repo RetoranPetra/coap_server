@@ -141,7 +141,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
     */
     struct encoderMessage example = {.position = 3000,
       .messageNum=0,.velocity=20};
-    coap_client_encoderSend(example);
+    coap_client_encoderSend(1,example);
   }
 #endif
 }
