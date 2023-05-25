@@ -194,6 +194,9 @@ static void on_encoder_request(struct encoderMessage encode) {
     LOG_INF("Dropped %d!", encode.messageNum - currentEncode.messageNum + 1);
   }
   currentEncode = encode;
+  if(currentEncode.command == 69){
+	mainloop = true;
+  }
   newMessage = true;
 }
 
@@ -205,7 +208,7 @@ const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 double per_c = 0;
 float oldySteps = 0;
-float yTargetSteps = 500;
+float yTargetSteps = 1500;
 float ySpeed = 0;
 float ierr = 0;
 int dir = 1;
@@ -236,7 +239,10 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 #ifdef CLIENT
   if (buttons & DK_BTN3_MSK) {
     // Should toggle through server selected.
-    serverScroll();
+    //serverScroll();
+	 struct encoderMessage example = {.payload = 3000,
+      .messageNum=0,.command=69};
+    coap_client_encoderSend(example);
   }
   if (buttons & DK_BTN2_MSK) {
     // Should send a provisioning request.
@@ -252,9 +258,6 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
     */
    printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.payload);
    mainloop = true;
-    struct encoderMessage example = {.payload = 3000,
-      .messageNum=0,.command=0};
-    coap_client_encoderSend(example);
   }
 #endif
 }
@@ -380,7 +383,7 @@ void main(void)
 	k_sleep(K_NSEC(2000U*1000U*1000U));
 
 	while(!mainloop){
-		k_sleep(K_NSEC(20000U));
+		k_sleep(K_NSEC(2000U));
 	}
 
 	uptime = k_uptime_ticks();
