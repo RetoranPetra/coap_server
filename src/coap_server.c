@@ -41,28 +41,23 @@
 #include <zephyr/drivers/gpio.h>
 #include <math.h>
 /* 1000 nsec = 1 usec */
-#define MIN_PER 600000
+#define MIN_PER 800000
 #define GEAR_PER 1000000//10000000
 #define GEAR_GUARD 200000
 #define MAX_PER 1000000000
 #define full_length_in_steps 3000
 #define pi 3.14159265
-#define step_pin 30
-#define dir_pin 31
-#define mode2_pin 0
+#define step_pin 29
+#define dir_pin 30
+#define mode2_pin 5
 #define mode1_pin 1
-#define mode0_pin 5
+#define mode0_pin 0
 #define delta_phi_start 0.01570796326//pi/2/100;
 #define MAXENCODER 30000.0
 #define maxRecord 300
 
-#define addrs 0x0007A000//0x00070000//
-#define notusable 0x9C7B
-#define maxPages 6//16//
-#define arraySize 20
-
-#define readFreq 80  //in ms
-#define switchTime 5000 //in ms
+#define invPolarity 1
+#define readPolarity 1
 
 bool mainloop = false;
 bool newMessage = false;
@@ -186,29 +181,12 @@ static void on_percentage_request(struct percentageStruct percent) {
   LOG_INF("Percentage request callback");
 }
 
-struct encoderMessage currentEncode = {};
-static void on_encoder_request(struct encoderMessage encode) {
-  //LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
-  //LOG_DBG("Encoder request callback!");
-  if (currentEncode.messageNum + 1 != encode.messageNum) {
-    LOG_INF("Dropped %d!", encode.messageNum - currentEncode.messageNum + 1);
-  }
-  currentEncode = encode;
-  if(currentEncode.command == 69){
-	mainloop = true;
-  }
-  newMessage = true;
-}
-
-static struct openthread_state_changed_cb ot_state_chaged_cb = {
-    .state_changed_cb = on_thread_state_changed};
-#endif
-
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
 double per_c = 0;
 float oldySteps = 0;
 float yTargetSteps = 1500;
+uint8_t scalar = 1U;
 float ySpeed = 0;
 float ierr = 0;
 int dir = 1;
@@ -229,6 +207,24 @@ float kI = 10.0/1000.0;
 
 int i = 0;
 
+struct encoderMessage currentEncode = {};
+static void on_encoder_request(struct encoderMessage encode) {
+  //LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
+  //LOG_DBG("Encoder request callback!");
+  if (currentEncode.messageNum + 1 != encode.messageNum) {
+    LOG_INF("Dropped %d!", encode.messageNum - currentEncode.messageNum + 1);
+  }
+  currentEncode = encode;
+  if(currentEncode.command == 69){
+	mainloop = true;
+  }
+  newMessage = true;
+}
+
+static struct openthread_state_changed_cb ot_state_chaged_cb = {
+    .state_changed_cb = on_thread_state_changed};
+#endif
+
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
 #ifdef SERVER
@@ -243,6 +239,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 	 struct encoderMessage example = {.payload = 3000,
       .messageNum=0,.command=69};
     coap_client_encoderSend(example);
+	mainloop = true;
   }
   if (buttons & DK_BTN2_MSK) {
     // Should send a provisioning request.
@@ -256,7 +253,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-   printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.payload);
+   printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i, scalar = %u\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.payload,scalar);
    mainloop = true;
   }
 #endif
@@ -327,7 +324,6 @@ void main(void)
 #endif /* ifdef ENCODER */
 
 	uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
-	uint8_t scalar = 1U;
 	per_c = period/1000000000.0;  //ns to s
 	//float ySteps = 0;
 	// float oldySteps = 0;
@@ -418,9 +414,9 @@ void main(void)
 		}
 		//ySteps = ySteps + 1.0/scalar*dir;
 		oldySteps = ySteps;
-    	ySteps = 3000.0*getPosition()/MAXENCODER;//*currentEncode.position/MAXENCODER;//
+    	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;//*currentEncode.position/MAXENCODER;//
 
-		if( oldySteps+3 < ySteps && ySteps < oldySteps+3){
+		if( oldySteps+2 < ySteps && ySteps < oldySteps+2){
 			notMovingCounter++;
 		}
 		else{
@@ -457,10 +453,10 @@ void main(void)
 
 		accel = a*dir;
 
-		if(dir == 1)
+		if(dir == 1*invPolarity)
 			gpio_pin_set(P0, dir_pin, 0); //Away from motor
 
-		if(dir == -1)
+		if(dir == -1*invPolarity)
 			gpio_pin_set(P0, dir_pin, 1); //Towards motor
 
 	//printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d\n",per_c,ySteps,accel,ySpeed,dir);
