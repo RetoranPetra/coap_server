@@ -9,7 +9,7 @@
 #define CLIENT
 #define SERVER
 //#define IMU
-//#define ENCODER
+#define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
@@ -42,13 +42,13 @@
 #include <math.h>
 /* 1000 nsec = 1 usec */
 #define MIN_PER 600000
-#define GEAR_PER 2000000//10000000
-#define GEAR_GUARD 400000
+#define GEAR_PER 1000000//10000000
+#define GEAR_GUARD 200000
 #define MAX_PER 1000000000
 #define full_length_in_steps 3000
 #define pi 3.14159265
-#define step_pin 29
-#define dir_pin 30
+#define step_pin 30
+#define dir_pin 31
 #define mode2_pin 0
 #define mode1_pin 1
 #define mode0_pin 5
@@ -217,17 +217,14 @@ double flip = 0;
 int notMovingCounter = 0;
 uint32_t uptime = 0;
 uint32_t oldtime = 0;
-uint32_t collectTimeDone = 0;
 float ySteps = 0;
 bool firstTimeAchieve = true;
-bool printNow = false;
 
 float kP = 20.0*pi/3000.0;
 float kD = -1050;
 float kI = 10.0/1000.0;
 
-float Poss[maxRecord];
-int possi = 0;
+int i = 0;
 
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
@@ -253,61 +250,26 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-   printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.position);
+   printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.payload);
    mainloop = true;
-    // struct encoderMessage example = {.position = 3000,
-    //   .messageNum=0,.velocity=20};
-    // coap_client_encoderSend(example);
+    struct encoderMessage example = {.payload = 3000,
+      .messageNum=0,.command=0};
+    coap_client_encoderSend(example);
   }
 #endif
 }
 
-void my_work_handler(struct k_work *work)
-{
-	if(!printNow){
-		if(possi < maxRecord){
-			Poss[possi] = ySteps;
-		}
-		possi++;
-		if(readFreq*possi > switchTime){
-			//yTargetSteps = 3000 - yTargetSteps;
-			//firstTimeAchieve = true;
-			//possi = 0;
-			//firstTimeAchieve = true;
-			printNow = true;
-			yTargetSteps = -yTargetSteps;
-			//printf("Changing to target %f\n",yTargetSteps);
-			ierr = 0;
-			ySpeed = 0;
-			per_c = 1;
-		}
-	}
-}
-K_WORK_DEFINE(my_work, my_work_handler);
-
-void my_timer_handler(struct k_timer *timer_id)
-{
-	k_work_submit(&my_work);
-}
-K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
-
-// static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
-//   uint32_t buttons = button_state & has_changed;
-//   if (buttons & DK_BTN4_MSK) {
-// 	printf("time is like %u and %u when %u\n", uptime, oldtime, k_uptime_ticks());
-//   }
-//   if (buttons & DK_BTN3_MSK) {
-// 	printf("P = %f, I = %f, D = %f, a = %f, error = %f\n",kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed,a,yTargetSteps - ySteps);
-//   }
-//   if (buttons & DK_BTN2_MSK) {
-// 	printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d\n",per_c,ySteps,accel,ySpeed,dir);
-//   }
-//   if (buttons & DK_BTN1_MSK) {
-// 	printf("Encpos = %i\n", getPosition());
-//   }
+// void my_work_handler(struct k_work *work)
+// {
+	
 // }
+// K_WORK_DEFINE(my_work, my_work_handler);
 
-//const struct device *flashmem = DEVICE_DT_GET(DT_PATH(soc,flash_controller_4001e000));
+// void my_timer_handler(struct k_timer *timer_id)
+// {
+// 	k_work_submit(&my_work);
+// }
+// K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
 
 
 void main(void)
@@ -362,7 +324,7 @@ void main(void)
 #endif /* ifdef ENCODER */
 
 	uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
-	uint32_t scalar = 1U;
+	uint8_t scalar = 1U;
 	per_c = period/1000000000.0;  //ns to s
 	//float ySteps = 0;
 	// float oldySteps = 0;
@@ -380,16 +342,6 @@ void main(void)
 	// uint32_t uptime = k_uptime_ticks();
 	// uint32_t oldtime = 0;
 	printk("Uptime is %u\n",uptime);
-
-	// ret = dk_buttons_init(on_button_changed);
-	// if (ret) {
-	// 	LOG_ERR("Cannot init buttons (error: %d)", ret);
-	// 	goto end;
-	// }
-	// float buf[arraySize];
-	// int bufindex = 0;
-	// size_t timesFull = 0;
-	// struct flash_pages_info pginf;
 
 	if (!device_is_ready(P0)) {
 		return;
@@ -424,51 +376,17 @@ void main(void)
 	gpio_pin_set(P0, mode1_pin, 0);
 	gpio_pin_set(P0, mode0_pin, 0);
 
-	// ret = flash_get_page_info_by_offs(flashmem, addrs, &pginf);
-	
-	// printf("getinfo ret %d and offset %u, size %u and i %u with max size = %u with doubles per page = %u\n",ret, pginf.start_offset,pginf.size,pginf.index,flash_get_page_count(flashmem), pginf.size/sizeof(per_c));
-	// ret = flash_erase(flashmem, addrs, pginf.size*maxPages);
-	// printf("erase ret %d\n",ret);
-
 	printk("Control Wirelessly Correct\n");
-	printf("Reading every %d and switching targets every %d\n",readFreq, switchTime);
 	k_sleep(K_NSEC(2000U*1000U*1000U));
 
 	while(!mainloop){
 		k_sleep(K_NSEC(20000U));
 	}
 
-	k_timer_start(&my_timer, K_MSEC(0), K_MSEC(readFreq));
 	uptime = k_uptime_ticks();
-	printk("Uptime is %u\n",uptime);
 
 	while (1) {		
-		//printf("Iteration nr %d and page %u \n",bufindex,timesFull);
-
-		if(printNow){//( ((yTargetSteps-2 <= ySteps) && (ySteps < yTargetSteps+2) && (per_c > 0.1) ) && firstTimeAchieve) || printNow){
-			// printf("Time has been done\n");
-			// if(possi < maxRecord){
-			// Poss[possi] = 0;
-			// }
-			// possi++;
-			// collectTimeDone = uptime;
-			for(int i=0; i<maxRecord && i<possi; i++){
-				printf("%f\n",Poss[i]);
-			}
-			possi = 0;
-			//firstTimeAchieve = false;
-			printNow = false;
-			// while((yTargetSteps-2 <= ySteps) && (ySteps < yTargetSteps+2)){
-			// 	printf("Printnow = %d and target = %f",printNow,yTargetSteps);
-			// }
-			//goto toend;
-		}
-
-		delta_phi = delta_phi_start/scalar;
-
-		// if((k_ticks_to_ms_floor32(uptime - collectTimeDone)> 10000) && !firstTimeAchieve){
-		// 	goto toend;
-		// }
+		//delta_phi = delta_phi_start/scalar;
 
 		if(notMovingCounter> 100 && (ySteps + dir*3<3000)){
 			for(int i = 0; i<3; i++){
@@ -480,28 +398,26 @@ void main(void)
 
 				k_sleep(K_MSEC(10));
 
-				ySteps = ySteps + 3;
-
-				period = period*2;
-				per_c = per_c*2;
+				ySteps = ySteps + 1.0*dir/scalar;
 			}
+			period = period*2;
+			per_c = per_c*2;
 		}
 
-		gpio_pin_set(P0, step_pin, 1);
+		for(i = 0; i<scalar; i++){
+			gpio_pin_set(P0, step_pin, 1);
 
-		k_sleep(K_NSEC(period/scalar/2U));
+			k_sleep(K_NSEC(period/scalar/2U));
 
-		gpio_pin_set(P0, step_pin, 0);
+			gpio_pin_set(P0, step_pin, 0);
 
-		k_sleep(K_NSEC(period/scalar/2U));
-
+			k_sleep(K_NSEC(period/scalar/2U));
+		}
 		//ySteps = ySteps + 1.0/scalar*dir;
-	//if(newMessage){
-		newMessage = false;
 		oldySteps = ySteps;
-    	ySteps = 3000.0*currentEncode.position/MAXENCODER;//*getPosition()/MAXENCODER;//
+    	ySteps = 3000.0*getPosition()/MAXENCODER;//*currentEncode.position/MAXENCODER;//
 
-		if(ySteps == oldySteps){
+		if( oldySteps+3 < ySteps && ySteps < oldySteps+3){
 			notMovingCounter++;
 		}
 		else{
@@ -545,23 +461,6 @@ void main(void)
 			gpio_pin_set(P0, dir_pin, 1); //Towards motor
 
 	//printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d\n",per_c,ySteps,accel,ySpeed,dir);
-	
-	// if(bufindex < arraySize){
-	// 	buf[bufindex] = ySteps;
-	// 	bufindex++;
-	// }
-	// else
-	// {
-	// 	if(timesFull*sizeof(buf)<maxPages*pginf.size){
-	// 		ret = flash_write(flashmem, addrs+sizeof(buf)*timesFull, buf, sizeof(buf));
-	// 		if(ret < 0)
-	// 			printf("write ret %d\n",ret);
-	// 		timesFull++;
-	// 		bufindex = 0;
-	// 		buf[bufindex] = ySteps;
-	// 		bufindex++;
-	// 	}
-	// }
 	 
     if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
     {
@@ -595,14 +494,14 @@ void main(void)
 			//printf("Should have theoretically stopped, per_c = %f\n",per_c);
 		}
 
-		// if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
-		// 	scalar = scalar*2U;  //gear down
-		// }
-		// else{
-		// 	if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
-		// 		scalar = scalar/2U;
-		// 		if(scalar < 1U) scalar = 1U;
-		// }
+		if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
+			scalar = scalar*2U;  //gear down
+		}
+		else{
+			if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
+				scalar = scalar/2U;
+				if(scalar < 1U) scalar = 1U;
+		}
 		switch(scalar){
 			case 1U:
 				gpio_pin_set(P0, mode2_pin, 0);
@@ -640,15 +539,6 @@ void main(void)
 		}
 	//}
 	}
-
-  toend: 
-		printf("Target Reached in %u\n", uptime);
-
-		for(int i=0; i<maxRecord && i<possi; i++){
-			printf("%f\n",Poss[i]);
-		}
-		printf("Might require up to %d, rn with every 0.08\n",possi);
-		printf("Collect time done = %u\n",collectTimeDone);
 
   end: return;
 }
