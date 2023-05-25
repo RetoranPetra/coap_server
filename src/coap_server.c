@@ -168,9 +168,7 @@ static void on_thread_state_changed(otChangedFlags flags,
 }
 
 static void
-on_generic_request( // otChangedFlags flags, struct openthread_context
-                    // *ot_context, void *user_data
-    char *msg) {
+on_generic_request(char *msg) {
   // Something to deal with message would normally go here. However, message is
   // just character string so it doesn't matter.
   LOG_INF("Generic Request event execution!");

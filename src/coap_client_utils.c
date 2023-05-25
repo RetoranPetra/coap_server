@@ -14,6 +14,7 @@
 #include <zephyr/net/socket.h>
 
 #include "coap_client_utils.h"
+#include "node.h"
 #include "zephyr/net/coap.h"
 
 LOG_MODULE_REGISTER(coap_client_utils, CONFIG_COAP_CLIENT_UTILS_LOG_LEVEL);
@@ -114,9 +115,12 @@ static struct sockaddr_in6 unique_local_addr[SERVERS] = {
 
 // m
 void serverScroll(void) {
+  static int serverNum = 0;
   serverSelector++;
   serverSelector = serverSelector % SERVERS;
-  LOG_INF("Selected Server %i Address: %s", serverSelector,
+  CONNECTIONS();
+  serverNum = connections[serverSelector];
+  LOG_INF("Server %i | On? %i | Addr %s", serverNum,is_connected[serverSelector],
           unique_local_addr_str[serverSelector]);
 }
 // m/
