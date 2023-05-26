@@ -57,7 +57,7 @@
 #define maxRecord 300
 
 #define invPolarity 1
-#define readPolarity 1
+#define readPolarity -1
 
 bool mainloop = false;
 bool newMessage = false;
@@ -378,9 +378,9 @@ void main(void)
 	printk("Control Wirelessly Correct\n");
 	k_sleep(K_NSEC(2000U*1000U*1000U));
 
-	while(!mainloop){
-		k_sleep(K_NSEC(2000U));
-	}
+	// while(!mainloop){
+	// 	k_sleep(K_NSEC(2000U));
+	// }
 
 	uptime = k_uptime_ticks();
 
