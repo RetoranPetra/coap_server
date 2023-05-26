@@ -190,8 +190,8 @@ static void on_percentage_request(struct percentageStruct percent) {
 }
 
 static void on_encoder_request(struct encoderMessage encode) {
-  LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
-  LOG_DBG("Encoder request callback!");
+  //TO ADDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+  
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
@@ -199,7 +199,8 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 #endif
 
 void main(void) {
-	int delay;
+	uint32_t uptime = 0;
+  uint32_t oldtime = 0;
   goto setup;
 start:
   LOG_INF("START!");
@@ -208,12 +209,8 @@ start:
     k_msleep(500);
   }
   while (1) {
-	delay = k_uptime_ticks()%90;
-	if(k_uptime_ticks()%15 == 1){
-		k_msleep(200);
-	}
-    k_msleep(10 + delay);
-    struct encoderMessage out = {.position = getPosition(),.messageNum=0,.velocity=getIntVel()};
+    k_msleep(10);
+    struct encoderMessage out = {.payload = getPosition(),.messageNum=0,.command=0};
 	//printk("%i\n",out.position);
     //LOG_DBG("Position:%i",out.position);
     coap_client_encoderSend(out);
