@@ -34,4 +34,11 @@
             label = "Encoder Index";
         };
     };
+    externalswitches {
+        compatible = "gpio-keys";
+        mechswitch: Mech_Switch {
+            gpios = < &gpio0 7 0x11>;
+            label = "MechSwitch";
+        };
+    };
 };

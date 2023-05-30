@@ -2,7 +2,7 @@
 #define __NODE_H
 
 //Nodes 0-5
-#define NODE 0
+#define NODE 1
 
 #if NODE==0
 #define CONNECTIONS() int connections[] = {1}
