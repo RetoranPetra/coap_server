@@ -175,6 +175,92 @@ float SEq_2, SEq_3, SEq_4 = 0.0f;
 float SEq_1 = 1.0f;
 
 
+
+int32_t getRawAccelerationX(void) {
+  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_XOUT_H, Buffer);
+  int32_t raw_data = ((int16_t)Buffer[0] << 8) + Buffer[1];
+  raw_data = (raw_data * _acc_scale) >> 16;
+  return (int16_t)raw_data * 9.81;
+}
+
+int32_t getRawAccelerationY(void) {
+  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_YOUT_H, Buffer);
+  int32_t raw_data = ((int16_t)Buffer[0] << 8) + Buffer[1];
+  raw_data = (raw_data * _acc_scale) >> 16;
+  return (int16_t)raw_data * 9.81;
+}
+
+int32_t getRawAccelerationZ(void) {
+  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_ZOUT_H, Buffer);
+  int32_t raw_data = ((int16_t)Buffer[0] << 8) + Buffer[1];
+  raw_data = (raw_data * _acc_scale) >> 16;
+  return (int16_t)raw_data * 9.81;
+}
+
+int16_t getRawGyroscopeX(void) {
+  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_XOUT_H, Buffer);
+  int32_t raw_data = ((int32_t)Buffer[0] << 8) + Buffer[1];
+  raw_data = (raw_data * _gyro_scale) >> 16;
+  return (int16_t)raw_data;
+}
+
+int16_t getRawGyroscopeY(void) {
+  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_YOUT_H, Buffer);
+  int32_t raw_data = ((int32_t)Buffer[0] << 8) + Buffer[1];
+  raw_data = (raw_data * _gyro_scale) >> 16;
+  return (int16_t)raw_data;
+}
+
+int16_t getRawGyroscopeZ(void) {
+  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_ZOUT_H, Buffer);
+  int32_t raw_data = ((int32_t)Buffer[0] << 8) + Buffer[1];
+  raw_data = (raw_data * _gyro_scale) >> 16;
+  return (int16_t)raw_data;
+}
+
+int16_t getTemperature(void) {
+  uint16_t rawdata;
+  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_TEMP_OUT_H, Buffer);
+  rawdata = (((uint32_t)Buffer[0]) << 8) + Buffer[1];
+  return (int16_t)(rawdata / 327 + 25);
+}
+
+void imuTestLoop(void) {
+  while (true) {
+    LOG_DBG("Accl_x: %d mm/s\n", getRawAccelerationX());
+    LOG_DBG("Accl_y: %d mm/s\n", getRawAccelerationY());
+    LOG_DBG("Accl_z: %d mm/s\n", getRawAccelerationZ());
+    LOG_DBG("Gyro_x: %d dps\n", getRawGyroscopeX());
+    LOG_DBG("Gyro_y: %d dps\n", getRawGyroscopeY());
+    LOG_DBG("Gyro_z: %d dps\n", getRawGyroscopeZ());
+    k_msleep(500);
+  }
+}
+#define G 9.80665
+#define PI 3.14159265359
+#define DISTANCE_PER_STEP 2.0*PI*8.5E-3/200.0
+#define SAMPLING_PERIOD 10 //in microsecs
+#define GYROMEASERROR 0.5
+#define BETA sqrt(3.0f / 4.0f) * GYROMEASERROR //compute BETA
+static const struct gpio_dt_spec Reset_Pin = GPIO_DT_SPEC_GET(DT_NODELABEL(mechswitch), gpios);
+
+
+void compWorkHandler(struct k_work *work) {
+  if(gpio_pin_get_dt(&Reset_Pin)) {
+    theta_offset = theta;
+    phi_offset = phi;
+    psi_offset = psi;
+  }
+  complementaryFilter();
+}
+K_WORK_DEFINE(comp_work,compWorkHandler);
+void compTimerHandler(struct k_timer *timer_id) {
+  k_work_submit(&comp_work);
+}
+K_TIMER_DEFINE(comp_timer,compTimerHandler,NULL);
+void compInit(void) {
+  k_timer_start(&comp_timer,K_SECONDS(0), K_MSEC(SAMPLING_PERIOD));
+}
 void ICM20600_startup(void) {
   LOG_DBG("Starting...\n"); // I2C_SPEED_GET(cfg)
   if (device_is_ready(dev_i2c.bus)) {
@@ -275,92 +361,7 @@ void ICM20600_startup(void) {
   //Sam's fix
   ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_XG_OFFS_USRH, 0xEF);
   ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_XG_OFFS_USRL, 0x34);
-}
-
-int32_t getRawAccelerationX(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_XOUT_H, Buffer);
-  int32_t raw_data = ((int16_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _acc_scale) >> 16;
-  return (int16_t)raw_data * 9.81;
-}
-
-int32_t getRawAccelerationY(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_YOUT_H, Buffer);
-  int32_t raw_data = ((int16_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _acc_scale) >> 16;
-  return (int16_t)raw_data * 9.81;
-}
-
-int32_t getRawAccelerationZ(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_ZOUT_H, Buffer);
-  int32_t raw_data = ((int16_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _acc_scale) >> 16;
-  return (int16_t)raw_data * 9.81;
-}
-
-int16_t getRawGyroscopeX(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_XOUT_H, Buffer);
-  int32_t raw_data = ((int32_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _gyro_scale) >> 16;
-  return (int16_t)raw_data;
-}
-
-int16_t getRawGyroscopeY(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_YOUT_H, Buffer);
-  int32_t raw_data = ((int32_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _gyro_scale) >> 16;
-  return (int16_t)raw_data;
-}
-
-int16_t getRawGyroscopeZ(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_ZOUT_H, Buffer);
-  int32_t raw_data = ((int32_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _gyro_scale) >> 16;
-  return (int16_t)raw_data;
-}
-
-int16_t getTemperature(void) {
-  uint16_t rawdata;
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_TEMP_OUT_H, Buffer);
-  rawdata = (((uint32_t)Buffer[0]) << 8) + Buffer[1];
-  return (int16_t)(rawdata / 327 + 25);
-}
-
-void imuTestLoop(void) {
-  while (true) {
-    LOG_DBG("Accl_x: %d mm/s\n", getRawAccelerationX());
-    LOG_DBG("Accl_y: %d mm/s\n", getRawAccelerationY());
-    LOG_DBG("Accl_z: %d mm/s\n", getRawAccelerationZ());
-    LOG_DBG("Gyro_x: %d dps\n", getRawGyroscopeX());
-    LOG_DBG("Gyro_y: %d dps\n", getRawGyroscopeY());
-    LOG_DBG("Gyro_z: %d dps\n", getRawGyroscopeZ());
-    k_msleep(500);
-  }
-}
-#define G 9.80665
-#define PI 3.14159265359
-#define DISTANCE_PER_STEP 2.0*PI*8.5E-3/200.0
-#define SAMPLING_PERIOD 10 //in microsecs
-#define GYROMEASERROR 0.5
-#define BETA sqrt(3.0f / 4.0f) * GYROMEASERROR //compute BETA
-static const struct gpio_dt_spec Reset_Pin = GPIO_DT_SPEC_GET(DT_NODELABEL(mechswitch), gpios);
-
-
-void compWorkHandler(struct k_work *work) {
-  if(gpio_pin_get_dt(&Reset_Pin)) {
-    theta_offset = theta;
-    phi_offset = phi;
-    psi_offset = psi;
-  }
-  complementaryFilter();
-}
-K_WORK_DEFINE(comp_work,compWorkHandler);
-void compTimerHandler(struct k_timer *timer_id) {
-  k_work_submit(&comp_work);
-}
-K_TIMER_DEFINE(comp_timer,compTimerHandler,NULL);
-void compInit(void) {
-  k_timer_start(&comp_timer,K_SECONDS(0), K_MSEC(SAMPLING_PERIOD));
+  compInit();
 }
 
 void complementaryFilter(void) {

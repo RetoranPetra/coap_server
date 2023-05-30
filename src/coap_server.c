@@ -8,7 +8,7 @@
 #include "coap_server_client_interface.h"
 #define CLIENT
 #define SERVER
-//#define IMU
+#define IMU
 //#define ENCODER
 
 #include <dk_buttons_and_leds.h>
