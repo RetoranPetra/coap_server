@@ -183,6 +183,7 @@ static void on_percentage_request(struct percentageStruct percent) {
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
+uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
 double per_c = 0;
 float oldySteps = 0;
 float yTargetSteps = 1500;
@@ -253,23 +254,31 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-   printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d, encpos = %i, scalar = %u\n",per_c,ySteps,accel,ySpeed,dir,currentEncode.payload,scalar);
+   printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMOving = %d\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter);
    mainloop = true;
   }
 #endif
 }
 
-// void my_work_handler(struct k_work *work)
-// {
-	
-// }
-// K_WORK_DEFINE(my_work, my_work_handler);
+void step_work_handler(struct k_work *work)
+{
+	for(i = 0; i<scalar; i++){
+		gpio_pin_set(P0, step_pin, 1);
 
-// void my_timer_handler(struct k_timer *timer_id)
-// {
-// 	k_work_submit(&my_work);
-// }
-// K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
+		k_sleep(K_NSEC(period/scalar/2U));
+
+		gpio_pin_set(P0, step_pin, 0);
+
+		k_sleep(K_NSEC(period/scalar/2U));
+	}
+}
+K_WORK_DEFINE(step_work, step_work_handler);
+
+void step_timer_handler(struct k_timer *timer_id)
+{
+	k_work_submit(&step_work);
+}
+K_TIMER_DEFINE(step_timer, step_timer_handler, NULL);
 
 
 void main(void)
@@ -323,7 +332,7 @@ void main(void)
   Setup_interrupt();
 #endif /* ifdef ENCODER */
 
-	uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
+	// uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
 	per_c = period/1000000000.0;  //ns to s
 	//float ySteps = 0;
 	// float oldySteps = 0;
@@ -378,17 +387,17 @@ void main(void)
 	printk("Control Wirelessly Correct\n");
 	k_sleep(K_NSEC(2000U*1000U*1000U));
 
-	// while(!mainloop){
-	// 	k_sleep(K_NSEC(2000U));
-	// }
+	while(!mainloop){
+		k_sleep(K_NSEC(2000U));
+	}
 
 	uptime = k_uptime_ticks();
 
 	while (1) {		
 		//delta_phi = delta_phi_start/scalar;
 
-		if(notMovingCounter> 100 && (ySteps + dir*3<3000)){
-			for(int i = 0; i<3; i++){
+		if(notMovingCounter> 100 && ((ySteps + dir*3<yTargetSteps-10) || (ySteps + dir*3>yTargetSteps+10))){
+			for(i = 0; i<3; i++){
 				gpio_pin_set(P0, step_pin, 1);
 
 				k_sleep(K_MSEC(10));
@@ -399,30 +408,33 @@ void main(void)
 
 				ySteps = ySteps + 1.0*dir/scalar;
 			}
+			printf("Antiblock measures\n");
 			period = period*2;
 			per_c = per_c*2;
+			notMovingCounter = 0;
 		}
 
-		for(i = 0; i<scalar; i++){
-			gpio_pin_set(P0, step_pin, 1);
+		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
+		// for(i = 0; i<scalar; i++){
+		// 	gpio_pin_set(P0, step_pin, 1);
 
-			k_sleep(K_NSEC(period/scalar/2U));
+		// 	k_sleep(K_NSEC(period/scalar/2U));
 
-			gpio_pin_set(P0, step_pin, 0);
+		// 	gpio_pin_set(P0, step_pin, 0);
 
-			k_sleep(K_NSEC(period/scalar/2U));
-		}
+		// 	k_sleep(K_NSEC(period/scalar/2U));
+		// }
 		//ySteps = ySteps + 1.0/scalar*dir;
 		oldySteps = ySteps;
     	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;//*currentEncode.position/MAXENCODER;//
 
-		if( oldySteps+2 < ySteps && ySteps < oldySteps+2){
+		if( oldySteps == ySteps ){
 			notMovingCounter++;
 		}
 		else{
 			notMovingCounter = 0;
 		}
-
+		oldtime = uptime;
 		uptime = k_uptime_ticks();
 		if(uptime - oldtime > 0){
 			ySpeed = (ySteps - oldySteps)/(uptime-oldtime);
@@ -430,7 +442,6 @@ void main(void)
 		else{
 			ySpeed = ySteps - oldySteps;
 		}
-		oldtime = uptime;
 
 		ierr = ierr + (yTargetSteps - ySteps)/3000.0*(uptime-oldtime)/32786.0/0.1;
 		if(kI*ierr > 20)
@@ -438,14 +449,10 @@ void main(void)
 		if(kI*ierr < -20){
 			ierr = -20.0/kI;
 		}
-
-		// if(ySpeed == 0){
-		// 	ySpeed = 10000.0;
-		// }
 	
 
 		if(flip!=0){
-			ySpeed = ySpeed/20.0;
+			ySpeed = ySpeed/10.0;
 			flip = 0;
 		}
 
@@ -459,7 +466,7 @@ void main(void)
 		if(dir == -1*invPolarity)
 			gpio_pin_set(P0, dir_pin, 1); //Towards motor
 
-	//printf("per_c = %f, ySteps = %f, accel = %f, ySpeed = %f, dir = %d\n",per_c,ySteps,accel,ySpeed,dir);
+    //printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr);
 	 
     if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
     {
