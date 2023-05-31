@@ -443,6 +443,7 @@ void coap_client_encoderSend(int server,struct encoderMessage input) {
   static uint16_t counter = 0;
   memcpy(encoderPointer, &input, ENCODER_PAYLOAD_SIZE);
   encoderPointer->messageNum = counter;
+  encoderPointer->nodeOrigin = NODE;
   counter++;
   serverTarget = server;
   submit_work_if_connected(&encoderSend_work);

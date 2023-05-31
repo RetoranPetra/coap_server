@@ -6,7 +6,7 @@
 
 #ifndef __COAP_SERVER_CLIENT_INTRFACE_H__
 #define __COAP_SERVER_CLIENT_INTRFACE_H__
-
+#include "node.h"
 #include <zephyr/kernel.h>
 #define COAP_PORT 5683
 
@@ -34,6 +34,7 @@ struct percentageStruct {
   char identifier[8];
 };
 struct encoderMessage {
+  uint8_t nodeOrigin;
   int32_t position;
   int32_t velocity;
   uint16_t messageNum;
@@ -57,7 +58,5 @@ struct encoderMessage {
 
 #define PERCENTAGE_URI_PATH "percentage"
 #define PERCENTAGE_PAYLOAD_SIZE sizeof(struct percentageStructHidden) //Should be 120.
-
-#define SERVERS 6
 
 #endif
