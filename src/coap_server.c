@@ -190,12 +190,6 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 #endif
 
 void main(void) {
-  goto setup;
-start:
-  LOG_INF("START!");
-
-  goto end;
-setup:
   // Need to sleep at start for logs to display correctly.
   k_msleep(1000);
 #ifdef SERVER
@@ -243,26 +237,226 @@ setup:
 #ifdef ENCODER
   Setup_interrupt();
 #endif /* ifdef ENCODER */
-  // See https://openthread.io/reference/group/api-channel-manager
 
   // Auto channel stuff
   otInstance *inst = openthread_get_default_instance();
   otChannelManagerSetAutoChannelSelectionEnabled(inst, false);
   // Seems to not work.
 
-  // otChannelManagerSetFavoredChannels(inst, 5); // Doesn't set channel, just
-  //  sets a preferred one so auto selector chooses it more often.
-  // otChannelManagerSetDelay(inst, 1);
-  // otChannelManagerRequestChannelSelect(inst, 7); // Request channel change to
-  //  7, doesn't work it seems.
-  /*
-  LOG_DBG("Favoured channel: %d", otChannelManagerGetFavoredChannels(inst));
-  while (1) {
-    k_msleep(1000);
-    LOG_DBG("Channel is: %d", nrf_802154_channel_get());
-  }
-  */
-  goto start;
-end:
+	// uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
+	per_c = period/1000000000.0;  //ns to s
+	//float ySteps = 0;
+	// float oldySteps = 0;
+	// float yTargetSteps = 1500;
+	// float ySpeed = 0;
+	// float ierr = 0;
+	//int ret;
+	// int dir = 1;
+	// double a = 0;
+	// double accel = 0;
+	// double delta_phi = delta_phi_start;
+	// double placeholder = period;
+	// double flip = 0;
+	// int notMovingCounter = 0;
+	// uint32_t uptime = k_uptime_ticks();
+	// uint32_t oldtime = 0;
+	printk("Uptime is %u\n",uptime);
+
+	if (!device_is_ready(P0)) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, step_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, dir_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, mode2_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, mode1_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	ret = gpio_pin_configure(P0, mode0_pin, GPIO_OUTPUT_INACTIVE);
+	if (ret < 0) {
+		return;
+	}
+
+	gpio_pin_set(P0, mode2_pin, 0);
+	gpio_pin_set(P0, mode1_pin, 0);
+	gpio_pin_set(P0, mode0_pin, 0);
+
+	printk("Control Wirelessly Correct\n");
+	k_sleep(K_NSEC(2000U*1000U*1000U));
+
+	while(!mainloop){
+		k_sleep(K_NSEC(2000U));
+	}
+
+	uptime = k_uptime_ticks();
+
+	while (1) {		
+		//delta_phi = delta_phi_start/scalar;
+
+		if(notMovingCounter> 100 && ((ySteps + dir*3<yTargetSteps-10) || (ySteps + dir*3>yTargetSteps+10))){
+			for(i = 0; i<3; i++){
+				gpio_pin_set(P0, step_pin, 1);
+
+				k_sleep(K_MSEC(10));
+
+				gpio_pin_set(P0, step_pin, 0);
+
+				k_sleep(K_MSEC(10));
+
+				ySteps = ySteps + 1.0*dir/scalar;
+			}
+			printf("Antiblock measures\n");
+			period = period*2;
+			per_c = per_c*2;
+			notMovingCounter = 0;
+		}
+
+		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
+		// for(i = 0; i<scalar; i++){
+		// 	gpio_pin_set(P0, step_pin, 1);
+
+		// 	k_sleep(K_NSEC(period/scalar/2U));
+
+		// 	gpio_pin_set(P0, step_pin, 0);
+
+		// 	k_sleep(K_NSEC(period/scalar/2U));
+		// }
+		//ySteps = ySteps + 1.0/scalar*dir;
+		oldySteps = ySteps;
+    	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;//*currentEncode.position/MAXENCODER;//
+
+		if( oldySteps == ySteps ){
+			notMovingCounter++;
+		}
+		else{
+			notMovingCounter = 0;
+		}
+		oldtime = uptime;
+		uptime = k_uptime_ticks();
+		if(uptime - oldtime > 0){
+			ySpeed = (ySteps - oldySteps)/(uptime-oldtime);
+		}
+		else{
+			ySpeed = ySteps - oldySteps;
+		}
+
+		ierr = ierr + (yTargetSteps - ySteps)/3000.0*(uptime-oldtime)/32786.0/0.1;
+		if(kI*ierr > 20)
+			ierr = 20.0/kI;
+		if(kI*ierr < -20){
+			ierr = -20.0/kI;
+		}
+	
+
+		if(flip!=0){
+			ySpeed = ySpeed/10.0;
+			flip = 0;
+		}
+
+		a = kP*(yTargetSteps-ySteps) + kD*ySpeed + kI*ierr;
+
+		accel = a*dir;
+
+		if(dir == 1*invPolarity)
+			gpio_pin_set(P0, dir_pin, 0); //Away from motor
+
+		if(dir == -1*invPolarity)
+			gpio_pin_set(P0, dir_pin, 1); //Towards motor
+
+    //printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr);
+	 
+    if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
+    {
+		flip = 1;
+		per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) - delta_phi/accel) - delta_phi/(accel*per_c*2);
+		accel = -accel;
+		dir = -dir;
+    }
+    else {
+        if(accel > 0.01) 
+        {
+    		    per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
+    	}
+    	else
+            if(accel < -0.01)
+    		{
+    		        per_c = -sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
+    		}
+	}
+
+		placeholder = per_c*1000000000;
+		period = placeholder;
+
+		if(period*scalar < MIN_PER){
+			period = MIN_PER;
+			per_c = period/1000000000.0;
+		}
+		if(period*scalar > MAX_PER){
+			period = MAX_PER;
+			per_c = period/1000000000.0;
+			//printf("Should have theoretically stopped, per_c = %f\n",per_c);
+		}
+
+		if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
+			scalar = scalar*2U;  //gear down
+		}
+		else{
+			if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
+				scalar = scalar/2U;
+				if(scalar < 1U) scalar = 1U;
+		}
+		switch(scalar){
+			case 1U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 0);
+				break;
+			case 2U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 1);
+				break;
+			case 4U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 1);
+				gpio_pin_set(P0, mode0_pin, 0);
+				break;
+			case 8U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 1);
+				gpio_pin_set(P0, mode0_pin, 1);
+				break;
+			case 16U:
+				gpio_pin_set(P0, mode2_pin, 1);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 0);
+				break;
+			case 32U:
+				gpio_pin_set(P0, mode2_pin, 1);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 1);
+				break;
+			default:
+				//printk("Scalar is wrong\n");
+			break;
+		}
+	//}
+	}
+
+  end: return;
   return;
 }
