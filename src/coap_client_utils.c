@@ -28,6 +28,7 @@ static int serverTarget = 0;
 static uint32_t poll_period;
 
 static bool is_connected[SERVERS];
+CONNECTIONS();
 
 static struct k_work unicast_light_work;
 static struct k_work multicast_light_work;
@@ -118,7 +119,6 @@ void serverScroll(void) {
   static int serverNum = 0;
   serverSelector++;
   serverSelector = serverSelector % SERVERS;
-  CONNECTIONS();
   serverNum = connections[serverSelector];
   LOG_INF("Server %i | On? %i | Addr %s", serverNum,is_connected[serverSelector],
           unique_local_addr_str[serverSelector]);
@@ -396,6 +396,7 @@ void coap_client_utils_init(/*
           update_device_state();
   }
   */
+  serverTarget=connections[0];
 }
 
 void coap_client_toggle_one_light(void) {
