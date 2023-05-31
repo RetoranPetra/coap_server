@@ -8,7 +8,7 @@
 #include "coap_server_client_interface.h"
 #define CLIENT
 #define SERVER
-#define IMU
+//#define IMU
 //#define ENCODER
 
 #include <dk_buttons_and_leds.h>
@@ -141,7 +141,13 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
     */
     struct encoderMessage example = {.position = 3000,
       .messageNum=0,.velocity=20};
-    coap_client_encoderSend(1,example);
+    switch (NODE) {
+      case 0:
+        LOG_DBG("I'm not initiating, I'm the master!");
+      default:
+        LOG_DBG("I'm %d, and I'll send to master!",NODE);
+        coap_client_encoderSend(0,example);
+    }
   }
 #endif
 }
@@ -181,8 +187,11 @@ static void on_percentage_request(struct percentageStruct percent) {
 }
 
 static void on_encoder_request(struct encoderMessage encode) {
-  LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
-  LOG_DBG("Encoder request callback!");
+  LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i,Origin:%i",encode.messageNum,encode.position,encode.velocity,encode.nodeOrigin);
+
+  //Return to sender after delay.
+  k_msleep(500);
+  coap_client_encoderSend(encode.nodeOrigin,encode);
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {

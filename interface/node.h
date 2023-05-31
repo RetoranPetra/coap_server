@@ -5,7 +5,7 @@
 #define NODE 1
 
 #if NODE==0
-#define CONNECTIONS() int connections[] = {1}
+#define CONNECTIONS() int connections[] = {1, 2, 3}
 #define SERVERS 1
 #elif NODE==1
 #define CONNECTIONS() int connections[] = {0}
