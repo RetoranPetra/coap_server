@@ -8,15 +8,15 @@
 #include "coap_server_client_interface.h"
 #define CLIENT
 #define SERVER
-//#define IMU
-//#define ENCODER
+// #define IMU
+// #define ENCODER
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/openthread.h>
-#include <zephyr/drivers/gpio.h>
 // Channel management
 #include <nrf_802154.h>
 #include <openthread/channel_manager.h>
@@ -37,7 +37,6 @@
 #endif
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
-
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -133,20 +132,22 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   }
   if (buttons & DK_BTN1_MSK) {
     // coap_client_toggle_one_light();
-    //coap_client_floatSend(10.768);
+    // coap_client_floatSend(10.768);
     /*
     struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-    struct encoderMessage example = {.position = 3000,
-      .messageNum=0,.velocity=20};
+    struct encoderMessage example = {
+        .position = 3000, .messageNum = 0, .velocity = 20};
     switch (NODE) {
-      case 0:
-        LOG_DBG("I'm not initiating, I'm the master!");
-      default:
-        LOG_DBG("I'm %d, and I'll send to master!",NODE);
-        coap_client_encoderSend(0,example);
+    case 0:
+      LOG_DBG("I'm not initiating, I'm the master!");
+      break;
+    default:
+      LOG_DBG("I'm %d, and I'll send to master!", NODE);
+      coap_client_encoderSend(0, example);
+      break;
     }
   }
 #endif
@@ -173,8 +174,7 @@ static void on_thread_state_changed(otChangedFlags flags,
   }
 }
 
-static void
-on_generic_request(char *msg) {
+static void on_generic_request(char *msg) {
   // Something to deal with message would normally go here. However, message is
   // just character string so it doesn't matter.
   LOG_INF("Generic Request event execution!");
@@ -185,13 +185,17 @@ static void on_percentage_request(struct percentageStruct percent) {
   ARG_UNUSED(percent);
   LOG_INF("Percentage request callback");
 }
+struct encoderMessage example = {
+      .position = 3000, .messageNum = 0, .velocity = 20};
 
 static void on_encoder_request(struct encoderMessage encode) {
-  LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i,Origin:%i",encode.messageNum,encode.position,encode.velocity,encode.nodeOrigin);
+  LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i,Origin:%i",
+          encode.messageNum, encode.position, encode.velocity,
+          encode.nodeOrigin);
 
-  //Return to sender after delay.
+  // Return to sender after delay.
   k_msleep(500);
-  coap_client_encoderSend(encode.nodeOrigin,encode);
+  coap_client_encoderSend((int)encode.nodeOrigin, encode);
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
@@ -201,7 +205,7 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 void main(void) {
   goto setup;
 start:
-  LOG_INF("START!");
+  LOG_INF("START NODE %d!", NODE);
 
   goto end;
 setup:
@@ -218,7 +222,8 @@ setup:
   k_work_init(&provisioning_work, activate_provisioning);
 
   ret = ot_coap_init(&deactivate_provisionig, &on_light_request,
-                     &on_generic_request, &on_float_request, &on_percentage_request, &on_encoder_request);
+                     &on_generic_request, &on_float_request,
+                     &on_percentage_request, &on_encoder_request);
   if (ret) {
     LOG_ERR("Could not initialize OpenThread CoAP");
     goto end;

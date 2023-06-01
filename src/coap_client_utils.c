@@ -23,11 +23,12 @@ LOG_MODULE_REGISTER(coap_client_utils, CONFIG_COAP_CLIENT_UTILS_LOG_LEVEL);
 #define RESPONSE_POLL_PERIOD 100
 
 static int serverSelector = 0;
+static int connectSelector = 0;
 static int serverTarget = 0;
 
 static uint32_t poll_period;
 
-static bool is_connected[SERVERS];
+static bool is_connected[6];
 CONNECTIONS();
 
 static struct k_work unicast_light_work;
@@ -69,8 +70,8 @@ static struct sockaddr_in6 multicast_local_addr = {
     .sin6_scope_id = 0U};
 
 /* Variable for storing server address acquiring in provisioning handshake */
-static char unique_local_addr_str[SERVERS][INET6_ADDRSTRLEN];
-static struct sockaddr_in6 unique_local_addr[SERVERS] = {
+static char unique_local_addr_str[6][INET6_ADDRSTRLEN];
+static struct sockaddr_in6 unique_local_addr[6] = {
     {.sin6_family = AF_INET6,
      .sin6_port = htons(COAP_PORT),
      .sin6_addr.s6_addr =
@@ -116,12 +117,10 @@ static struct sockaddr_in6 unique_local_addr[SERVERS] = {
 
 // m
 void serverScroll(void) {
-  static int serverNum = 0;
-  serverSelector++;
-  serverSelector = serverSelector % SERVERS;
-  serverNum = connections[serverSelector];
-  LOG_INF("Server %i | On? %i | Addr %s", serverNum,is_connected[serverSelector],
-          unique_local_addr_str[serverSelector]);
+  connectSelector++;
+  connectSelector = connectSelector % SERVERS;
+  serverSelector = connections[connectSelector];
+  LOG_INF("Server %i | On? %i | Addr %s", serverSelector,is_connected[serverSelector], unique_local_addr_str[serverSelector]);
 }
 // m/
 
@@ -193,7 +192,7 @@ static int on_provisioning_reply(const struct coap_packet *response,
     goto exit;
   }
 
-  LOG_INF("Received peer address: %s", unique_local_addr_str[serverSelector]);
+  LOG_INF("Received peer address: %s for %d", unique_local_addr_str[serverSelector],serverSelector);
 
 exit:
   if (IS_ENABLED(CONFIG_OPENTHREAD_MTD_SED)) {
@@ -357,6 +356,7 @@ static void encoderSend(struct k_work *item) {
 
 static void submit_work_if_connected(struct k_work *work) {
 //  if (is_connected[serverTarget]) {
+  LOG_DBG("Target is %d AKA %s",serverTarget,unique_local_addr_str[serverTarget]);
   if (true) {
     k_work_submit(work);
   } else {
@@ -396,7 +396,7 @@ void coap_client_utils_init(/*
           update_device_state();
   }
   */
-  serverTarget=connections[0];
+  serverSelector=connections[0];
 }
 
 void coap_client_toggle_one_light(void) {

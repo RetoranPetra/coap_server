@@ -34,7 +34,7 @@ struct percentageStruct {
   char identifier[8];
 };
 struct encoderMessage {
-  uint8_t nodeOrigin;
+  int8_t nodeOrigin;
   int32_t position;
   int32_t velocity;
   uint16_t messageNum;
