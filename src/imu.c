@@ -189,7 +189,7 @@ int32_t getRawAccelerationX(void) {
   buf[0] = Buffer[0];
   int32_t raw_data = ((int16_t)buf[0] << 8) + buf[1];
   raw_data = (raw_data * (32000)) >> 16;
-  return (int16_t)raw_data + 125;
+  return (int16_t)raw_data + 23;
 }
 
 int32_t getRawAccelerationY(void) {
@@ -203,7 +203,7 @@ int32_t getRawAccelerationY(void) {
   int32_t raw_data = ((int16_t)buf[0] << 8) + buf[1];
   // LOG_DBG("Y:  %x\n",raw_data);
   raw_data = (raw_data * (32000)) >> 16;
-  return raw_data - 499;
+  return raw_data + 110;
 }
 
 int32_t getRawAccelerationZ(void) {
@@ -285,6 +285,7 @@ void compWorkHandler(struct k_work *work) {
     psi_offset = psi;
   }
   complementaryFilter();
+  LOG_DBG("theta %f | phi %f | psi %f",theta,phi,psi);
 }
 K_WORK_DEFINE(comp_work, compWorkHandler);
 void compTimerHandler(struct k_timer *timer_id) { k_work_submit(&comp_work); }
@@ -410,8 +411,7 @@ void complementaryFilter(void) {
   double Th_off = theta;
   double phi_off = phi;
   double psi_off = psi;
-  LOG_DBG("a_x:%f,a_y:%f,a_z:%f,w_x:%f,w_y:%f,w_z:%f,", a_x, a_y, a_z, w_x, w_y,
-          w_z);
+  //LOG_DBG("a_x:%f,a_y:%f,a_z:%f,w_x:%f,w_y:%f,w_z:%f,", a_x, a_y, a_z, w_x, w_y,w_z);
   float norm; // vector norm
   float SEqDot_omega_1, SEqDot_omega_2, SEqDot_omega_3,
       SEqDot_omega_4;  // quaternion derrivative from gyroscopes elements
@@ -488,6 +488,7 @@ void complementaryFilter(void) {
   if (isnan(psi)) {
     psi = 0;
   }
+  LOG_DBG("a_x:%f,a_y:%f,a_z:%f,w_x:%f,w_y:%f,w_z:%f,", a_x, a_y, a_z, w_x, w_y,w_z);
 }
 
 double getCompTheta(void) { return theta; }
