@@ -68,7 +68,7 @@ void coap_client_genericSend(int server,char *msg);
 void coap_client_floatSend(int server,double num);
 void coap_client_percentageSend(int server,struct percentageStruct input);
 void coap_client_encoderSend(int server,struct encoderMessage input);
-void coap_client_cmdSend(int server, struct commandMsg input, int doMulticast);
+void coap_client_cmdSend(int server, struct commandMsg input);
 
 void serverScroll(void);
 

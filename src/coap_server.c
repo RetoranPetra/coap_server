@@ -153,9 +153,11 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
     */
     struct commandMsg example = {
       .cmd = 0,
-      .datum1 = 100
+      .datum1 = 100,
+      .datum2 = 200,
+      .datum3 = 300
     };
-    coap_client_cmdSend(0,example,0);
+    coap_client_cmdSend(-1,example);
   }
 #endif
 }

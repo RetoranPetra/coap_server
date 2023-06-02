@@ -123,7 +123,8 @@ void serverScroll(void) {
   connectSelector++;
   connectSelector = connectSelector % SERVERS;
   serverSelector = connections[connectSelector];
-  LOG_INF("Server %i | On? %i | Addr %s", serverSelector,is_connected[serverSelector], unique_local_addr_str[serverSelector]);
+  LOG_INF("Server %i | On? %i | Addr %s", serverSelector,
+          is_connected[serverSelector], unique_local_addr_str[serverSelector]);
 }
 // m/
 
@@ -195,7 +196,8 @@ static int on_provisioning_reply(const struct coap_packet *response,
     goto exit;
   }
 
-  LOG_INF("Received peer address: %s for %d", unique_local_addr_str[serverSelector],serverSelector);
+  LOG_INF("Received peer address: %s for %d",
+          unique_local_addr_str[serverSelector], serverSelector);
 
 exit:
   if (IS_ENABLED(CONFIG_OPENTHREAD_MTD_SED)) {
@@ -308,16 +310,12 @@ static void cmdSend(struct k_work *item) {
   const struct sockaddr *address;
   if (cmdDoMulti) {
     address = (const struct sockaddr *)&multicast_local_addr;
-  }
-  else {
+  } else {
     address = (const struct sockaddr *)&unique_local_addr[serverTarget];
   }
   ARG_UNUSED(item);
-  if (coap_send_request(
-          COAP_METHOD_PUT,
-          address,
-          cmd_option, (char *)cmdPointer, CMD_PAYLOAD_SIZE,
-          NULL) >= 0) {
+  if (coap_send_request(COAP_METHOD_PUT, address, cmd_option,
+                        (char *)cmdPointer, CMD_PAYLOAD_SIZE, NULL) >= 0) {
     LOG_DBG("Cmd message send success!\n");
   } else {
     LOG_DBG("Cmd message send fail!\n");
@@ -326,8 +324,13 @@ static void cmdSend(struct k_work *item) {
 // m/
 
 static void submit_work_if_connected(struct k_work *work) {
-//  if (is_connected[serverTarget]) {
-  LOG_DBG("Target is %d AKA %s",serverTarget,unique_local_addr_str[serverTarget]);
+  //  if (is_connected[serverTarget]) {
+  if (serverTarget == -1) {
+    LOG_DBG("Multicast Target!");
+  } else {
+    LOG_DBG("Target is %d AKA %s", serverTarget,
+            unique_local_addr_str[serverTarget]);
+  }
   if (true) {
     k_work_submit(work);
   } else {
@@ -368,7 +371,7 @@ void coap_client_utils_init(/*
           update_device_state();
   }
   */
-  serverSelector=connections[0];
+  serverSelector = connections[0];
 }
 
 void coap_client_toggle_one_light(void) {
@@ -383,13 +386,13 @@ void coap_client_send_provisioning_request(void) {
   k_work_submit(&provisioning_work);
 }
 
-void coap_client_genericSend(int server,char *msg) {
+void coap_client_genericSend(int server, char *msg) {
   memcpy(messagePointer, msg, GENERIC_PAYLOAD_SIZE);
   serverTarget = server;
   submit_work_if_connected(&genericSend_work);
 }
 
-void coap_client_floatSend(int server,double num) {
+void coap_client_floatSend(int server, double num) {
   memcpy(floatPointer, &num, sizeof(double));
   serverTarget = server;
   submit_work_if_connected(&floatSend_work);
@@ -400,7 +403,7 @@ void coap_client_toggle_minimal_sleepy_end_device(void) {
     k_work_submit(&toggle_MTD_SED_work);
   }
 }
-void coap_client_percentageSend(int server,struct percentageStruct input) {
+void coap_client_percentageSend(int server, struct percentageStruct input) {
   static uint16_t counter = 0;
   for (int i = 0; i < 3; i++) {
     percentagePointer->percentages[i] =
@@ -411,7 +414,7 @@ void coap_client_percentageSend(int server,struct percentageStruct input) {
   serverTarget = server;
   submit_work_if_connected(&percentageSend_work);
 }
-void coap_client_encoderSend(int server,struct encoderMessage input) {
+void coap_client_encoderSend(int server, struct encoderMessage input) {
   static uint16_t counter = 0;
   memcpy(encoderPointer, &input, ENCODER_PAYLOAD_SIZE);
   encoderPointer->messageNum = counter;
@@ -421,9 +424,9 @@ void coap_client_encoderSend(int server,struct encoderMessage input) {
   submit_work_if_connected(&encoderSend_work);
 }
 
-void coap_client_cmdSend(int server, struct commandMsg input, int doMulticast) {
+void coap_client_cmdSend(int server, struct commandMsg input) {
   static uint16_t counter = 0;
-  cmdDoMulti = doMulticast;
+  cmdDoMulti = -1 == server;
   memcpy(cmdPointer, &input, CMD_PAYLOAD_SIZE);
   encoderPointer->messageNum = counter;
   encoderPointer->nodeOrigin = NODE;
