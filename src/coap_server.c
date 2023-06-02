@@ -17,6 +17,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/openthread.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/uart.h> //uart
 //#include <zephyr/drivers/flash.h>
 // Channel management
 #include <nrf_802154.h>
@@ -41,10 +42,10 @@
 #include <zephyr/drivers/gpio.h>
 #include <math.h>
 /* 1000 nsec = 1 usec */
-#define MIN_PER 800000
-#define GEAR_PER 1000000//10000000
-#define GEAR_GUARD 200000
-#define MAX_PER 1000000000
+//#define MIN_PER 1000000 //1 ms
+#define GEAR_PER 10000000//2000000//
+#define GEAR_GUARD 400000
+#define MAX_PER 10000000000
 #define full_length_in_steps 3000
 #define pi 3.14159265
 #define step_pin 29
@@ -55,6 +56,8 @@
 #define delta_phi_start 0.01570796326//pi/2/100;
 #define MAXENCODER 30000.0
 #define maxRecord 300
+
+#define RECEIVE_TIMEOUT 100
 
 #define invPolarity 1
 #define readPolarity -1
@@ -183,12 +186,25 @@ static void on_percentage_request(struct percentageStruct percent) {
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
+//UART device obtained
+const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+//Define transmission buffer (changed from 8 to 32)
+static uint8_t tx_buf[] =   {"nRF Connect SDK Fundamentals Course\n\r"
+                             "Press 1-3 on your keyboard to toggle LEDS 1-3 on your development kit\n\r"}; //Transmission message displayed here
+//Define receive buffer and initialise it
+static uint8_t rx_buf[10] = {0}; //Buffer size set to 10
+
 uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
+uint32_t MIN_PER = 1000000;
 double per_c = 0;
 float oldySteps = 0;
 float yTargetSteps = 1500;
 uint8_t scalar = 1U;
+int TEMPORARY = 0;
 float ySpeed = 0;
+float error = 0;
+float olderror = 0;
 float ierr = 0;
 int dir = 1;
 double a = 0;
@@ -201,12 +217,87 @@ uint32_t uptime = 0;
 uint32_t oldtime = 0;
 float ySteps = 0;
 bool firstTimeAchieve = true;
+int step_semaphore = -1;
 
-float kP = 20.0*pi/3000.0;
-float kD = -1050;
-float kI = 10.0/1000.0;
+float kP = 2.0*pi/3000.0;
+float kD = -200;
+float kI = 100.0/1000.0;
+
+// float kP = 20.0*pi/3000.0;
+// float kD = -1050;
+// float kI = 1.0/1000.0;
 
 int i = 0;
+
+//UART application callback function
+static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
+{
+	switch (evt->type) {
+		//Only defining the receiving modes
+	case UART_RX_RDY:
+		if((evt->data.rx.len) == 1){ //If something entered
+
+		//Defining responses:
+		if(evt->data.rx.buf[evt->data.rx.offset] == 'w'){
+			printk("Upwards \n");
+			ierr = 0;
+			yTargetSteps = 2500;
+			//Up code uart
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'a'){
+			printk("Left \n");
+			mainloop = true;
+			//Left code uart
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 's'){
+			printk("Downwards \n");
+			ierr = 0;
+			yTargetSteps = 500;
+			//Down code uart					
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'd'){
+			printk("Right \n");
+
+			//Right code uart
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '='){
+			kD = kD + 50;
+			printf("Kd+ is now %f \n",kD);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '-'){
+			kD = kD - 50;
+			printf("Kd- is now %f \n",kD);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '['){
+			MIN_PER -= 10000;
+			printf("MIN_PER- is now %u \n",MIN_PER);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == ']'){
+			MIN_PER += 10000;
+			printf("MIN_PER+ is now %u \n",MIN_PER);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'r'){
+			resetPosition(0);
+			ySteps = 0;
+			printf("Reset position to 0");
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == ' '){
+			printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'p'){
+			printf("per_c = %f, a = %f, P = %f, I = %f, D = %f\n",per_c,a,kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed);
+		}
+		}
+
+        break;
+	case UART_RX_DISABLED: //Constant receiving
+		uart_rx_enable(dev ,rx_buf,sizeof rx_buf,RECEIVE_TIMEOUT);
+		break;
+		
+	default:
+		break;
+	}
+}
 
 struct encoderMessage currentEncode = {};
 static void on_encoder_request(struct encoderMessage encode) {
@@ -254,7 +345,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-   printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMOving = %d\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter);
+   printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore);
    mainloop = true;
   }
 #endif
@@ -262,15 +353,25 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
 
 void step_work_handler(struct k_work *work)
 {
-	for(i = 0; i<scalar; i++){
-		gpio_pin_set(P0, step_pin, 1);
-
-		k_sleep(K_NSEC(period/scalar/2U));
-
-		gpio_pin_set(P0, step_pin, 0);
-
-		k_sleep(K_NSEC(period/scalar/2U));
+	if(step_semaphore < 2*scalar){
+		TEMPORARY++;
+		//printk("I am stepping for %d\n", TEMPORARY);
+		if(step_semaphore%2 == 0){
+			gpio_pin_set(P0, step_pin, 1);}
+		else{
+			gpio_pin_set(P0, step_pin, 0);}
+		
+		step_semaphore++;
 	}
+	// for(i = 0; i<scalar; i++){
+	// 	gpio_pin_set(P0, step_pin, 1);
+
+	// 	k_sleep(K_NSEC(period/scalar/2U));
+
+	// 	gpio_pin_set(P0, step_pin, 0);
+
+	// 	k_sleep(K_NSEC(period/scalar/2U));
+	// }
 }
 K_WORK_DEFINE(step_work, step_work_handler);
 
@@ -380,6 +481,23 @@ void main(void)
 		return;
 	}
 
+	//UART callback function registered
+	ret = uart_callback_set(uart, uart_cb, NULL);
+		if (ret) {
+			return 1;
+		}
+	//Data sent over UART
+	ret = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
+	if (ret) {
+		return 1;
+	}	
+	//uart_rx_enable() call to start receiving
+	ret = uart_rx_enable(uart ,rx_buf,sizeof rx_buf,RECEIVE_TIMEOUT);
+	if (ret) {
+		return 1;
+	}
+
+	printk("Uart is setup \n");
 	gpio_pin_set(P0, mode2_pin, 0);
 	gpio_pin_set(P0, mode1_pin, 0);
 	gpio_pin_set(P0, mode0_pin, 0);
@@ -406,13 +524,23 @@ void main(void)
 
 				k_sleep(K_MSEC(10));
 
-				ySteps = ySteps + 1.0*dir/scalar;
+				//ySteps = ySteps + 1.0*dir/scalar;
 			}
 			printf("Antiblock measures\n");
-			period = period*2;
-			per_c = per_c*2;
+			period = period*10;
+			per_c = per_c*10;
 			notMovingCounter = 0;
 		}
+
+		not_done_stepping:
+		
+		if(step_semaphore < 2*scalar && step_semaphore != -1){
+			k_sleep(K_NSEC(5000));
+			goto not_done_stepping;
+		}
+		step_semaphore = 0;
+		k_timer_start(&step_timer,K_NSEC(0),K_NSEC(period/scalar/2U));
+
 
 		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
 		// for(i = 0; i<scalar; i++){
@@ -426,7 +554,9 @@ void main(void)
 		// }
 		//ySteps = ySteps + 1.0/scalar*dir;
 		oldySteps = ySteps;
+		olderror = error;
     	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;//*currentEncode.position/MAXENCODER;//
+		error = (yTargetSteps - ySteps);
 
 		if( oldySteps == ySteps ){
 			notMovingCounter++;
@@ -434,16 +564,18 @@ void main(void)
 		else{
 			notMovingCounter = 0;
 		}
+		
 		oldtime = uptime;
+		//all olds have been updated
 		uptime = k_uptime_ticks();
 		if(uptime - oldtime > 0){
-			ySpeed = (ySteps - oldySteps)/(uptime-oldtime);
+			ySpeed = (error - olderror)/(uptime-oldtime);
 		}
 		else{
-			ySpeed = ySteps - oldySteps;
+			ySpeed = error - olderror;
 		}
 
-		ierr = ierr + (yTargetSteps - ySteps)/3000.0*(uptime-oldtime)/32786.0/0.1;
+		ierr = ierr + error/3000.0*(uptime-oldtime)/32786.0*5;
 		if(kI*ierr > 20)
 			ierr = 20.0/kI;
 		if(kI*ierr < -20){
@@ -451,13 +583,17 @@ void main(void)
 		}
 	
 
-		if(flip!=0){
-			ySpeed = ySpeed/10.0;
-			flip = 0;
-		}
+		// if(flip!=0){
+		// 	ySpeed = ySpeed/20.0;//ySpeed/10.0;
+		// 	flip = 0;
+		// }
 
 		a = kP*(yTargetSteps-ySteps) + kD*ySpeed + kI*ierr;
-
+		if(a > 20)
+			a = 20;
+		if(a < -20)
+		    a = -20;
+ 
 		accel = a*dir;
 
 		if(dir == 1*invPolarity)
