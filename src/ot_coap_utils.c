@@ -30,6 +30,7 @@ struct server_context {
   float_request_callback_t on_float_request;
   percentage_request_callback_t on_percentage_request;
   encoder_request_callback_t on_encoder_request;
+  cmd_request_callback_t on_cmd_request;
 };
 
 static struct server_context srv_context = {
@@ -71,6 +72,10 @@ static otCoapResource percentage_resource = {.mUriPath = PERCENTAGE_URI_PATH,
                                         .mContext = NULL,
                                         .mNext = NULL};
 static otCoapResource encoder_resource = {.mUriPath = ENCODER_URI_PATH,
+                                        .mHandler = NULL,
+                                        .mContext = NULL,
+                                        .mNext = NULL};
+static otCoapResource cmd_resource = {.mUriPath = CMD_URI_PATH,
                                         .mHandler = NULL,
                                         .mContext = NULL,
                                         .mNext = NULL};
@@ -250,6 +255,21 @@ static void encoder_request_handler(void *context, otMessage *message,
   ARG_UNUSED(message_info);
   srv_context.on_encoder_request(myBuffer);
 }
+static void cmd_request_handler(void *context, otMessage *message,
+                                  const otMessageInfo *message_info) {
+  // Need to do this with malloc if it's going to be accessed outside this
+  // function using srv_context.
+  struct commandMsg myBuffer = {};
+
+  // otMessageLength could be used in place of generic payload size.
+
+  otMessageRead(message, otMessageGetOffset(message), &myBuffer,
+                CMD_PAYLOAD_SIZE);
+
+  ARG_UNUSED(context);
+  ARG_UNUSED(message_info);
+  srv_context.on_cmd_request(myBuffer);
+}
 
 static void coap_default_handler(void *context, otMessage *message,
                                  const otMessageInfo *message_info) {
@@ -278,7 +298,8 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
                  generic_request_callback_t on_generic_request,
                  float_request_callback_t on_float_request,
                  percentage_request_callback_t on_percentage_request,
-                 encoder_request_callback_t on_encoder_request) {
+                 encoder_request_callback_t on_encoder_request,
+                 cmd_request_callback_t on_cmd_request) {
   otError error;
 
   srv_context.provisioning_enabled = false;
@@ -289,6 +310,7 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
   srv_context.on_float_request = on_float_request;
   srv_context.on_percentage_request = on_percentage_request;
   srv_context.on_encoder_request = on_encoder_request;
+  srv_context.on_cmd_request = on_cmd_request;
   // m/
 
   srv_context.ot = openthread_get_default_instance();
@@ -316,6 +338,9 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
 
   encoder_resource.mContext=srv_context.ot;
   encoder_resource.mHandler=encoder_request_handler;
+
+  cmd_resource.mContext=srv_context.ot;
+  cmd_resource.mHandler=cmd_request_handler;
   // m/
 
   otCoapSetDefaultHandler(srv_context.ot, coap_default_handler, NULL);
@@ -326,6 +351,7 @@ int ot_coap_init(provisioning_request_callback_t on_provisioning_request,
   otCoapAddResource(srv_context.ot, &float_resource);
   otCoapAddResource(srv_context.ot, &percentage_resource);
   otCoapAddResource(srv_context.ot, &encoder_resource);
+  otCoapAddResource(srv_context.ot, &cmd_resource);
   // m/
 
   error = otCoapStart(srv_context.ot, COAP_PORT);

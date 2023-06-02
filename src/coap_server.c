@@ -138,6 +138,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
+    /*
     struct encoderMessage example = {
         .position = 3000, .messageNum = 0, .velocity = 20};
     switch (NODE) {
@@ -149,6 +150,12 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       coap_client_encoderSend(0, example);
       break;
     }
+    */
+    struct commandMsg example = {
+      .cmd = 0,
+      .datum1 = 100
+    };
+    coap_client_cmdSend(0,example,0);
   }
 #endif
 }
@@ -197,6 +204,9 @@ static void on_encoder_request(struct encoderMessage encode) {
   k_msleep(500);
   coap_client_encoderSend((int)encode.nodeOrigin, encode);
 }
+static void on_cmd_request(struct commandMsg cmd) {
+  LOG_DBG("CMD CALLBACK!");
+}
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
@@ -223,7 +233,7 @@ setup:
 
   ret = ot_coap_init(&deactivate_provisionig, &on_light_request,
                      &on_generic_request, &on_float_request,
-                     &on_percentage_request, &on_encoder_request);
+                     &on_percentage_request, &on_encoder_request, &on_cmd_request);
   if (ret) {
     LOG_ERR("Could not initialize OpenThread CoAP");
     goto end;
@@ -263,19 +273,6 @@ setup:
   otInstance *inst = openthread_get_default_instance();
   otChannelManagerSetAutoChannelSelectionEnabled(inst, false);
   // Seems to not work.
-
-  // otChannelManagerSetFavoredChannels(inst, 5); // Doesn't set channel, just
-  //  sets a preferred one so auto selector chooses it more often.
-  // otChannelManagerSetDelay(inst, 1);
-  // otChannelManagerRequestChannelSelect(inst, 7); // Request channel change to
-  //  7, doesn't work it seems.
-  /*
-  LOG_DBG("Favoured channel: %d", otChannelManagerGetFavoredChannels(inst));
-  while (1) {
-    k_msleep(1000);
-    LOG_DBG("Channel is: %d", nrf_802154_channel_get());
-  }
-  */
   goto start;
 end:
   return;
