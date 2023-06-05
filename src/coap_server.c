@@ -32,12 +32,7 @@
 #endif
 
 // Control modules
-#ifdef ENCODER
 #include "AEDB_9140.h"
-#endif
-#ifdef IMU
-#include "imu.h"
-#endif
 
 #include <stdio.h>
 #include <zephyr/drivers/gpio.h>
@@ -46,7 +41,7 @@
 //#define MIN_PER 1000000 //1 ms
 #define GEAR_PER 10000000//2000000//
 #define GEAR_GUARD 400000
-#define MAX_PER 10000000000
+#define MAX_PER 1400000000
 #define full_length_in_steps 3000
 #define pi 3.14159265
 #define step_pin 29
@@ -60,7 +55,7 @@
 
 #define RECEIVE_TIMEOUT 100
 
-#define invPolarity 1
+#define invPolarity -1
 #define readPolarity -1
 
 bool mainloop = false;
@@ -73,7 +68,7 @@ LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
 #define LIGHT_LED DK_LED4
-#ifdef SERVER
+
 static struct k_work provisioning_work;
 
 static struct k_timer led_timer;
@@ -144,7 +139,7 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 
   dk_set_led_off(PROVISIONING_LED);
 }
-#endif
+
 
 // struct commandMsg example = {
 //   .cmd = 0,
@@ -154,7 +149,7 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 // };
 // coap_client_cmdSend(-1,example);
 
-#ifdef SERVER
+
 static void on_thread_state_changed(otChangedFlags flags,
                                     struct openthread_context *ot_context,
                                     void *user_data) {
@@ -286,7 +281,6 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'd'){
 			LOG_DBG("Right \n");
-
 			//Right code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '='){
@@ -405,22 +399,29 @@ static void on_encoder_request(struct encoderMessage encode) {
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
-#endif
+
 
 static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   uint32_t buttons = button_state & has_changed;
-#ifdef SERVER
+
   if (buttons & DK_BTN4_MSK) {
     k_work_submit(&provisioning_work);
   }
-#endif
-#ifdef CLIENT
+
+
   if (buttons & DK_BTN3_MSK) {
     // Should toggle through server selected.
     //serverScroll();
-	 struct encoderMessage example = {.nodeOrigin = NODE, .payload = 3000,
-      .messageNum=0,.command=69};
-    coap_client_encoderSend(1, example);
+	//  struct encoderMessage example = {.nodeOrigin = NODE, .payload = 3000,
+    //   .messageNum=0,.command=69};
+    // coap_client_encoderSend(1, example);
+	gpio_pin_set(P0, step_pin, 1);
+
+	k_sleep(K_MSEC(100));
+
+	gpio_pin_set(P0, step_pin, 0);
+
+	k_sleep(K_MSEC(100));
 	mainloop = true;
   }
   if (buttons & DK_BTN2_MSK) {
@@ -438,7 +439,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
    LOG_DBG("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore);
    mainloop = true;
   }
-#endif
+
 }
 
 void step_work_handler(struct k_work *work)
@@ -476,7 +477,7 @@ void main(void)
 {
     // Need to sleep at start for logs to display correctly.
   k_msleep(1000);
-#ifdef SERVER
+
   int ret;
 
   LOG_INF("Start CoAP-server sample of Node %d", NODE);
@@ -512,17 +513,13 @@ void main(void)
   openthread_start(openthread_get_default_context());
 
   LOG_DBG("Passed openthread_start in main!");
-#endif
-#ifdef CLIENT
+
+
   coap_client_utils_init();
   LOG_DBG("Passed client start in main!");
-#endif /* ifdef CLIENT */
-#ifdef IMU
-  ICM20600_startup();
-#endif /* ifdef IMU */
-#ifdef ENCODER
+
+  //ICM20600_startup();
   Setup_interrupt();
-#endif /* ifdef ENCODER */
 
 	ret = gpio_pin_configure(P0, mode0_pin, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) {
@@ -567,45 +564,49 @@ void main(void)
 			goto restart;
 		}
 		//Uncomment for utilising Antiblock Measures
-		if(notMovingCounter> 100 && ((ySteps + dir*5<yTargetSteps-10) || (ySteps + dir*5>yTargetSteps+10))){
-			step_semaphore = 64;
-			for(i = 0; i<5; i++){
-				gpio_pin_set(P0, step_pin, 1);
+		// if(notMovingCounter> 100 && ((ySteps + dir*5<yTargetSteps-10) || (ySteps + dir*5>yTargetSteps+10))){
+		// 	step_semaphore = 64;
+		// 	for(i = 0; i<5; i++){
+		// 		gpio_pin_set(P0, step_pin, 1);
+				
+		// 		k_sleep(K_MSEC(100));
 
-				k_sleep(K_MSEC(10));
+		// 		gpio_pin_set(P0, step_pin, 0);
 
-				gpio_pin_set(P0, step_pin, 0);
+		// 		k_sleep(K_MSEC(100));
 
-				k_sleep(K_MSEC(10));
+		// 		//ySteps = ySteps + 1.0*dir/scalar;
+		// 	}
+		// 	LOG_DBG("Antiblock measures\n");
+		// 	period = period*2;
+		// 	per_c = per_c*2;
+		// 	notMovingCounter = 0;
+		// }
 
-				//ySteps = ySteps + 1.0*dir/scalar;
-			}
-			LOG_DBG("Antiblock measures\n");
-			period = period*10;
-			per_c = per_c*10;
-			notMovingCounter = 0;
-		}
-
-		not_done_stepping:
+		// not_done_stepping:
 		
-		if(step_semaphore < 2*scalar && step_semaphore != -1){
-			k_sleep(K_NSEC(5000));
-			goto not_done_stepping;
-		}
-		step_semaphore = 0;
-		k_timer_start(&step_timer,K_NSEC(0),K_NSEC(period/scalar/2U));
+		// if(step_semaphore < 2*scalar && step_semaphore != -1){
+		// 	k_sleep(K_NSEC(5000));
+		// 	goto not_done_stepping;
+		// }
+		// step_semaphore = 0;
+		//k_timer_start(&step_timer,K_NSEC(0),K_NSEC(period/scalar/2U));
 
 
 		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
-		// for(i = 0; i<scalar; i++){
-		// 	gpio_pin_set(P0, step_pin, 1);
+		for(i = 0; i<scalar; i++){
+			ret = gpio_pin_set(P0, step_pin, 1);
 
-		// 	k_sleep(K_NSEC(period/scalar/2U));
+			LOG_DBG("Step ret = %d",ret);
 
-		// 	gpio_pin_set(P0, step_pin, 0);
+			k_sleep(K_NSEC(period/scalar/2U));
 
-		// 	k_sleep(K_NSEC(period/scalar/2U));
-		// }
+			ret = gpio_pin_set(P0, step_pin, 0);
+
+			LOG_DBG("Step ret = %d",ret);
+
+			k_sleep(K_NSEC(period/scalar/2U));
+		}
 		//ySteps = ySteps + 1.0/scalar*dir;
 		oldySteps = ySteps;
 		olderror = error;
