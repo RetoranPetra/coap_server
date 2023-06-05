@@ -352,7 +352,12 @@ static void on_encoder_request(struct encoderMessage encode) {
 }
 
 static void on_cmd_request(struct commandMsg cmd) {
-  LOG_DBG("CMD CALLBACK!");
+	if(cmd.datum1 == 69)
+		mainloop = true;
+	if(cmd.datum1 == 70){
+		yTargetSteps = cmd.datum2;
+		ierr = 0;
+	}
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
