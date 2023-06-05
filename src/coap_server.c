@@ -57,7 +57,7 @@
 #define MAXENCODER 30000.0
 #define maxRecord 300
 
-#define invPolarity 1
+#define invPolarity -1
 #define readPolarity -1
 
 bool mainloop = false;
@@ -178,7 +178,7 @@ static void on_percentage_request(struct percentageStruct percent) {
   LOG_INF("Percentage request callback");
 }
 struct encoderMessage currentEncode = {
-      .position = 3000, .messageNum = 0, .velocity = 20};
+	.nodeOrigin = NODE, .payload = 3000, .messageNum = 0, .command = 69};
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
@@ -235,9 +235,9 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
   if (buttons & DK_BTN3_MSK) {
     // Should toggle through server selected.
     //serverScroll();
-	 struct encoderMessage example = {.payload = 3000,
+	 struct encoderMessage example = {.nodeOrigin = NODE, .payload = 3000,
       .messageNum=0,.command=69};
-    coap_client_encoderSend(example);
+    coap_client_encoderSend(1, example);
 	mainloop = true;
   }
   if (buttons & DK_BTN2_MSK) {
@@ -408,8 +408,8 @@ void main(void)
 				ySteps = ySteps + 1.0*dir/scalar;
 			}
 			printf("Antiblock measures\n");
-			period = period*2;
-			per_c = per_c*2;
+			period = period*10;
+			per_c = per_c*10;
 			notMovingCounter = 0;
 		}
 
