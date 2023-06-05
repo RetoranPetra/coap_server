@@ -1,7 +1,12 @@
+#include <math.h>
+#include <stdlib.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/logging/log.h>
 
 #include "imu.h"
+#include "zephyr/kernel.h"
 
 /***************************************************************
     ICM20600 I2C Register
@@ -81,6 +86,14 @@
 #define ICM20600_DEVICE_RESET_BIT (1 << 7)
 
 #define I2C0_NODE DT_NODELABEL(icm20600)
+#define G 9.80665
+#define PI 3.14159265359
+#define DISTANCE_PER_STEP 2.0 * PI * 8.5E-3 / 200.0
+#define SAMPLING_PERIOD 100 // in microsecs
+#define GYROMEASERROR 0.5
+#define BETA sqrt(3.0f / 4.0f) * GYROMEASERROR // compute BETA
+static const struct gpio_dt_spec Reset_Pin =
+    GPIO_DT_SPEC_GET(DT_NODELABEL(mechswitch), gpios);
 
 LOG_MODULE_REGISTER(imu, CONFIG_IMU_LOG_LEVEL);
 
@@ -164,12 +177,129 @@ static const struct i2c_dt_spec dev_i2c = I2C_DT_SPEC_GET(I2C0_NODE);
 int ret;
 int8_t Buffer[16] = {0};
 uint16_t _acc_scale, _gyro_scale;
+// New stuff for complementary
+double theta = 0.0, phi = 0.0, psi = 0.0, theta_offset = 0.0, phi_offset = 0.0,
+       psi_offset = 0.0;
+float SEq_2 = 0.0f, SEq_3 = 0.0f, SEq_4 = 0.0f, SEq_1 = 1.0f;
 
-void ICM20600_startup(void) {
-  LOG_DBG("Starting...\n"); // I2C_SPEED_GET(cfg)
-  if (device_is_ready(dev_i2c.bus)) {
-    LOG_DBG("I2C bus %X is ready!\n\r", (uint32_t)(dev_i2c.bus->name));
+int32_t getRawAccelerationX(void) {
+  int8_t Buffer[16] = {0};
+  int8_t buf[2] = {0};
+  int ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_XOUT_H, Buffer);
+  buf[0] = Buffer[0];
+  int32_t raw_data = ((int16_t)buf[0] << 8) + buf[1];
+  raw_data = (raw_data * (32000)) >> 16;
+  return (int16_t)raw_data + 23;
+}
+
+int32_t getRawAccelerationY(void) {
+  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_YOUT_H, Buffer);
+  int8_t Buffer[16] = {0};
+  int8_t buf[2] = {0};
+  int ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_YOUT_H, Buffer);
+  buf[0] = Buffer[0];
+  // ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_YOUT_L,Buffer);
+  // buf[1] = Buffer[0];
+  int32_t raw_data = ((int16_t)buf[0] << 8) + buf[1];
+  // LOG_DBG("Y:  %x\n",raw_data);
+  raw_data = (raw_data * (32000)) >> 16;
+  return raw_data + 110;
+}
+
+int32_t getRawAccelerationZ(void) {
+  int8_t Buffer[16] = {0};
+  int8_t buf[2] = {0};
+  int ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_ZOUT_H, Buffer);
+  buf[0] = Buffer[0];
+  // ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_ACCEL_ZOUT_L,Buffer);
+  // buf[1] = Buffer[0];
+  int32_t raw_data = ((int16_t)buf[0] << 8) + buf[1];
+  // LOG_DBG(",Z:  %x\n",raw_data);
+  raw_data = (raw_data * (32000)) >> 16;
+  return raw_data;
+}
+
+int16_t getRawGyroscopeX(void) {
+  int8_t Buffer[16] = {0};
+  int8_t buf[2] = {0};
+  int ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_XOUT_H, Buffer);
+  buf[0] = Buffer[0];
+  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_XOUT_L, Buffer);
+  // buf[1] = Buffer[0];
+  int32_t raw_data = ((int32_t)buf[0] << 8) + buf[1];
+  // LOG_DBG("Gyro_x: %x\n",raw_data);
+  raw_data = (raw_data * (4000)) >> 16;
+  return raw_data - 1031;
+}
+
+int16_t getRawGyroscopeY(void) {
+  int8_t Buffer[16] = {0};
+  int8_t buf[2] = {0};
+  int ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_YOUT_H, Buffer);
+  buf[0] = Buffer[0];
+  // ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_GYRO_YOUT_L,Buffer);
+  // buf[1] = Buffer[0];
+  int32_t raw_data = ((int32_t)buf[0] << 8) + buf[1];
+  // LOG_DBG("Gyro_y: %x\n",raw_data);
+  raw_data = (raw_data * (4000)) >> 16;
+  return raw_data;
+}
+
+int16_t getRawGyroscopeZ(void) {
+  int8_t Buffer[16] = {0};
+  int8_t buf[2] = {0};
+  int ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_ZOUT_H, Buffer);
+  buf[0] = Buffer[0];
+  // ret = i2c_reg_read_byte_dt(&dev_i2c,ICM20600_GYRO_ZOUT_L,Buffer);
+  // buf[1] = Buffer[0];
+  int32_t raw_data = ((int32_t)buf[0] << 8) + buf[1];
+  // LOG_DBG("Gyro_z: %x\n",raw_data);
+  raw_data = (raw_data * (4000)) >> 16;
+  return raw_data + 16; // 16
+}
+
+int16_t getTemperature(void) {
+  uint16_t rawdata;
+  uint8_t Buffer[16] = {0};
+  int ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_TEMP_OUT_H, Buffer);
+  rawdata = (((uint16_t)Buffer[0]) << 8) + Buffer[1];
+  return (int16_t)(rawdata / 327 + 25);
+}
+
+void imuTestLoop(void) {
+  while (true) {
+    LOG_DBG("Accl_x: %d mm/s\n", getRawAccelerationX());
+    LOG_DBG("Accl_y: %d mm/s\n", getRawAccelerationY());
+    LOG_DBG("Accl_z: %d mm/s\n", getRawAccelerationZ());
+    LOG_DBG("Gyro_x: %d dps\n", getRawGyroscopeX());
+    LOG_DBG("Gyro_y: %d dps\n", getRawGyroscopeY());
+    LOG_DBG("Gyro_z: %d dps\n", getRawGyroscopeZ());
+    k_msleep(500);
   }
+}
+
+void compWorkHandler(struct k_work *work) {
+  if (gpio_pin_get_dt(&Reset_Pin)) {
+    theta_offset = theta;
+    phi_offset = phi;
+    psi_offset = psi;
+  }
+  complementaryFilter();
+  LOG_DBG("theta %f | phi %f | psi %f",theta,phi,psi);
+}
+K_WORK_DEFINE(comp_work, compWorkHandler);
+void compTimerHandler(struct k_timer *timer_id) { k_work_submit(&comp_work); }
+K_TIMER_DEFINE(comp_timer, compTimerHandler, NULL);
+void compInit(void) {
+  k_timer_start(&comp_timer, K_SECONDS(0), K_MSEC(SAMPLING_PERIOD));
+}
+void ICM20600_startup(void) {
+  int ret;
+  int8_t Buffer[16] = {0};
+  LOG_DBG("Starting...\n"); // I2C_SPEED_GET(cfg)
+  while (!device_is_ready(dev_i2c.bus)) {
+  }
+  LOG_DBG("I2C bus %X is ready!\n\r", (uint32_t)(dev_i2c.bus->name));
 
   // Get the Device ID
   ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_WHO_AM_I, Buffer);
@@ -217,7 +347,6 @@ void ICM20600_startup(void) {
   data = Buffer[0];
   data &= 0xe7; // 0b11100111
   data |= 0x18; // 0bxxx11xxx
-  _gyro_scale = 4000;
 
   LOG_DBG("Stage: Setting Gyro Config \n");
   ret = i2c_reg_write_byte_dt(&dev_i2c, ICM20600_GYRO_CONFIG, data);
@@ -245,7 +374,7 @@ void ICM20600_startup(void) {
   data = Buffer[0];
   data &= 0xe7;
   data |= 0x18; // 0bxxx11xxx
-  _acc_scale = 32000;
+
   LOG_DBG("Gyro Accleration Config set point: %X\n", data);
   ret = i2c_reg_write_byte_dt(&dev_i2c, ICM20600_ACCEL_CONFIG, data);
   data = 0;
@@ -262,68 +391,106 @@ void ICM20600_startup(void) {
   data &= 0xcf; // & 0b11001111
   data |= 0x00;
   ret = i2c_reg_write_byte_dt(&dev_i2c, ICM20600_ACCEL_CONFIG2, data);
-  //Sam's fix
-  ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_XG_OFFS_USRH, 0xEF);
-  ret = i2c_reg_write_byte_dt(&dev_i2c,ICM20600_XG_OFFS_USRL, 0x34);
+
+  // To the offset, take the negative hexdecimal as a decimal: 0x4500 =
+
+  gpio_pin_configure_dt(&Reset_Pin, GPIO_INPUT);
+  compInit();
 }
 
-int32_t getRawAccelerationX(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_XOUT_H, Buffer);
-  int32_t raw_data = ((int16_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _acc_scale) >> 16;
-  return (int16_t)raw_data * 9.81;
-}
+void complementaryFilter(void) {
+  double a_x = getRawAccelerationX() * G / 1000;
+  double a_y = getRawAccelerationY() * G / 1000;
+  double a_z = getRawAccelerationZ() * G / 1000;
 
-int32_t getRawAccelerationY(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_YOUT_H, Buffer);
-  int32_t raw_data = ((int16_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _acc_scale) >> 16;
-  return (int16_t)raw_data * 9.81;
-}
+  double w_x = getRawGyroscopeX() * 2 * PI / 360;
+  double w_y = getRawGyroscopeY() * 2 * PI / 360;
+  double w_z = getRawGyroscopeZ() * 2 * PI / 360;
 
-int32_t getRawAccelerationZ(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_ACCEL_ZOUT_H, Buffer);
-  int32_t raw_data = ((int16_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _acc_scale) >> 16;
-  return (int16_t)raw_data * 9.81;
-}
-
-int16_t getRawGyroscopeX(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_XOUT_H, Buffer);
-  int32_t raw_data = ((int32_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _gyro_scale) >> 16;
-  return (int16_t)raw_data;
-}
-
-int16_t getRawGyroscopeY(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_YOUT_H, Buffer);
-  int32_t raw_data = ((int32_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _gyro_scale) >> 16;
-  return (int16_t)raw_data;
-}
-
-int16_t getRawGyroscopeZ(void) {
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_GYRO_ZOUT_H, Buffer);
-  int32_t raw_data = ((int32_t)Buffer[0] << 8) + Buffer[1];
-  raw_data = (raw_data * _gyro_scale) >> 16;
-  return (int16_t)raw_data;
-}
-
-int16_t getTemperature(void) {
-  uint16_t rawdata;
-  ret = i2c_reg_read_byte_dt(&dev_i2c, ICM20600_TEMP_OUT_H, Buffer);
-  rawdata = (((uint32_t)Buffer[0]) << 8) + Buffer[1];
-  return (int16_t)(rawdata / 327 + 25);
-}
-
-void imuTestLoop(void) {
-  while (true) {
-    LOG_DBG("Accl_x: %d mm/s\n", getRawAccelerationX());
-    LOG_DBG("Accl_y: %d mm/s\n", getRawAccelerationY());
-    LOG_DBG("Accl_z: %d mm/s\n", getRawAccelerationZ());
-    LOG_DBG("Gyro_x: %d dps\n", getRawGyroscopeX());
-    LOG_DBG("Gyro_y: %d dps\n", getRawGyroscopeY());
-    LOG_DBG("Gyro_z: %d dps\n", getRawGyroscopeZ());
-    k_msleep(500);
+  double dt = SAMPLING_PERIOD * pow(10, -3);
+  double Th_off = theta;
+  double phi_off = phi;
+  double psi_off = psi;
+  //LOG_DBG("a_x:%f,a_y:%f,a_z:%f,w_x:%f,w_y:%f,w_z:%f,", a_x, a_y, a_z, w_x, w_y,w_z);
+  float norm; // vector norm
+  float SEqDot_omega_1, SEqDot_omega_2, SEqDot_omega_3,
+      SEqDot_omega_4;  // quaternion derrivative from gyroscopes elements
+  float f_1, f_2, f_3; // objective function elements
+  float J_11or24, J_12or23, J_13or22, J_14or21, J_32,
+      J_33; // objective function Jacobian elements
+  float SEqHatDot_1, SEqHatDot_2, SEqHatDot_3,
+      SEqHatDot_4; // estimated direction of the gyroscope error
+  // Axulirary variables to avoid reapeated calcualtions
+  float halfSEq_1 = 0.5f * SEq_1;
+  float halfSEq_2 = 0.5f * SEq_2;
+  float halfSEq_3 = 0.5f * SEq_3;
+  float halfSEq_4 = 0.5f * SEq_4;
+  float twoSEq_1 = 2.0f * SEq_1;
+  float twoSEq_2 = 2.0f * SEq_2;
+  float twoSEq_3 = 2.0f * SEq_3;
+  // Normalise the accelerometer measurement
+  norm = sqrt(a_x * a_x + a_y * a_y + a_z * a_z);
+  a_x /= norm;
+  a_y /= norm;
+  a_z /= norm;
+  // Compute the objective function and Jacobian
+  f_1 = twoSEq_2 * SEq_4 - twoSEq_1 * SEq_3 - a_x;
+  f_2 = twoSEq_1 * SEq_2 + twoSEq_3 * SEq_4 - a_y;
+  f_3 = 1.0f - twoSEq_2 * SEq_2 - twoSEq_3 * SEq_3 - a_z;
+  J_11or24 = twoSEq_3; // J_11 negated in matrix multiplication
+  J_12or23 = 2.0f * SEq_4;
+  J_13or22 = twoSEq_1; // J_12 negated in matrix multiplication
+  J_14or21 = twoSEq_2;
+  J_32 = 2.0f * J_14or21; // negated in matrix multiplication
+  J_33 = 2.0f * J_11or24; // negated in matrix multiplication
+  // Compute the gradient (matrix multiplication)
+  SEqHatDot_1 = J_14or21 * f_2 - J_11or24 * f_1;
+  SEqHatDot_2 = J_12or23 * f_1 + J_13or22 * f_2 - J_32 * f_3;
+  SEqHatDot_3 = J_12or23 * f_2 - J_33 * f_3 - J_13or22 * f_1;
+  SEqHatDot_4 = J_14or21 * f_1 + J_11or24 * f_2;
+  // Normalise the gradient
+  norm = sqrt(SEqHatDot_1 * SEqHatDot_1 + SEqHatDot_2 * SEqHatDot_2 +
+              SEqHatDot_3 * SEqHatDot_3 + SEqHatDot_4 * SEqHatDot_4);
+  SEqHatDot_1 /= norm;
+  SEqHatDot_2 /= norm;
+  SEqHatDot_3 /= norm;
+  SEqHatDot_4 /= norm;
+  // Compute the quaternion derrivative measured by gyroscopes
+  SEqDot_omega_1 = -halfSEq_2 * w_x - halfSEq_3 * w_y - halfSEq_4 * w_z;
+  SEqDot_omega_2 = halfSEq_1 * w_x + halfSEq_3 * w_z - halfSEq_4 * w_y;
+  SEqDot_omega_3 = halfSEq_1 * w_y - halfSEq_2 * w_z + halfSEq_4 * w_x;
+  SEqDot_omega_4 = halfSEq_1 * w_z + halfSEq_2 * w_y - halfSEq_3 * w_x;
+  // Compute then integrate the estimated quaternion derrivative
+  SEq_1 += (SEqDot_omega_1 - (BETA * SEqHatDot_1)) * dt;
+  SEq_2 += (SEqDot_omega_2 - (BETA * SEqHatDot_2)) * dt;
+  SEq_3 += (SEqDot_omega_3 - (BETA * SEqHatDot_3)) * dt;
+  SEq_4 += (SEqDot_omega_4 - (BETA * SEqHatDot_4)) * dt;
+  // Normalise quaternion
+  norm = sqrt(SEq_1 * SEq_1 + SEq_2 * SEq_2 + SEq_3 * SEq_3 + SEq_4 * SEq_4);
+  SEq_1 /= norm;
+  SEq_2 /= norm;
+  SEq_3 /= norm;
+  SEq_4 /= norm;
+  theta = -asin(2 * SEq_2 * SEq_4 + 2 * SEq_2 * SEq_4) - Th_off;
+  if (isnan(theta)) // double Th_off,double phi_off,double psi_off
+  {
+    theta = 0;
   }
+  phi = atan2(2 * SEq_3 * SEq_4 - 2 * SEq_1 * SEq_2,
+              2 * SEq_1 * SEq_1 + 2 * SEq_4 * SEq_4 - 1) -
+        phi_off;
+  if (isnan(phi)) {
+    phi = 0;
+  }
+  psi = atan2(2 * SEq_2 * SEq_3 - 2 * SEq_1 * SEq_4,
+              2 * SEq_1 * SEq_1 + 2 * SEq_2 * SEq_2 - 1) -
+        psi_off;
+  if (isnan(psi)) {
+    psi = 0;
+  }
+  LOG_DBG("a_x:%f,a_y:%f,a_z:%f,w_x:%f,w_y:%f,w_z:%f,", a_x, a_y, a_z, w_x, w_y,w_z);
 }
+
+double getCompTheta(void) { return theta; }
+double getCompPhi(void) { return phi; }
+double getCompPsi(void) { return psi; }

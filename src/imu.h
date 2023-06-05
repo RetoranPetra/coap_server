@@ -10,4 +10,8 @@ int16_t getRawGyroscopeY(void);
 int16_t getRawGyroscopeZ(void);
 int16_t getTemperature(void);
 void imuTestLoop(void);
+void complementaryFilter(void);
+double getCompTheta(void);
+double getCompPhi(void);
+double getCompPsi(void);
 #endif

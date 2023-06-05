@@ -64,10 +64,11 @@ void coap_client_send_provisioning_request(void);
  */
 void coap_client_toggle_minimal_sleepy_end_device(void);
 
-void coap_client_genericSend(char *msg);
-void coap_client_floatSend(double num);
-void coap_client_percentageSend(struct percentageStruct input);
-void coap_client_encoderSend(struct encoderMessage input);
+void coap_client_genericSend(int server,char *msg);
+void coap_client_floatSend(int server,double num);
+void coap_client_percentageSend(int server,struct percentageStruct input);
+void coap_client_encoderSend(int server,struct encoderMessage input);
+void coap_client_cmdSend(int server, struct commandMsg input);
 
 void serverScroll(void);
 

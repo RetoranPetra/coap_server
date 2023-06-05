@@ -13,6 +13,7 @@
 
 #include <dk_buttons_and_leds.h>
 #include <openthread/thread.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/openthread.h>
@@ -38,8 +39,6 @@
 #include "imu.h"
 #endif
 
-#include <stdio.h>
-#include <zephyr/drivers/gpio.h>
 #include <math.h>
 /* 1000 nsec = 1 usec */
 //#define MIN_PER 1000000 //1 ms
@@ -68,7 +67,6 @@ bool inPrinting = false;
 
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
-
 
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
@@ -169,10 +167,7 @@ static void on_thread_state_changed(otChangedFlags flags,
   }
 }
 
-static void
-on_generic_request( // otChangedFlags flags, struct openthread_context
-                    // *ot_context, void *user_data
-    char *msg) {
+static void on_generic_request(char *msg) {
   // Something to deal with message would normally go here. However, message is
   // just character string so it doesn't matter.
   LOG_INF("Generic Request event execution!");
@@ -183,6 +178,8 @@ static void on_percentage_request(struct percentageStruct percent) {
   ARG_UNUSED(percent);
   LOG_INF("Percentage request callback");
 }
+struct encoderMessage example = {
+      .payload = 3000, .messageNum = 0, .command = 20};
 
 const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 
@@ -354,6 +351,9 @@ static void on_encoder_request(struct encoderMessage encode) {
   newMessage = true;
 }
 
+static void on_cmd_request(struct commandMsg cmd) {
+  LOG_DBG("CMD CALLBACK!");
+
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
 #endif
@@ -438,7 +438,8 @@ void main(void)
   k_work_init(&provisioning_work, activate_provisioning);
 
   ret = ot_coap_init(&deactivate_provisionig, &on_light_request,
-                     &on_generic_request, &on_float_request, &on_percentage_request, &on_encoder_request);
+                     &on_generic_request, &on_float_request,
+                     &on_percentage_request, &on_encoder_request, &on_cmd_request);
   if (ret) {
     LOG_ERR("Could not initialize OpenThread CoAP");
     goto end;

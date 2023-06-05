@@ -6,7 +6,7 @@
 
 #ifndef __COAP_SERVER_CLIENT_INTRFACE_H__
 #define __COAP_SERVER_CLIENT_INTRFACE_H__
-
+#include "node.h"
 #include <zephyr/kernel.h>
 #define COAP_PORT 5683
 
@@ -34,15 +34,25 @@ struct percentageStruct {
   char identifier[8];
 };
 struct encoderMessage {
+  int8_t nodeOrigin;
   int32_t payload;
   int8_t command;
   uint16_t messageNum;
 };
-
+struct commandMsg {
+  uint8_t cmd;
+  int8_t nodeOrigin;
+  uint32_t datum1;
+  uint32_t datum2;
+  uint32_t datum3;
+  uint16_t msgNum;
+};
 // Payload size seems to be limited to https://stackoverflow.com/questions/42203857/how-much-data-can-hold-coap-in-single-message 127 bytes.
 
 #define PROVISIONING_URI_PATH "provisioning"
 
+#define CMD_URI_PATH "cmd"
+#define CMD_PAYLOAD_SIZE sizeof(struct commandMsg)
 
 #define LIGHT_URI_PATH "light"
 #define LIGHT_PAYLOAD_SIZE 1
@@ -57,8 +67,5 @@ struct encoderMessage {
 
 #define PERCENTAGE_URI_PATH "percentage"
 #define PERCENTAGE_PAYLOAD_SIZE sizeof(struct percentageStructHidden) //Should be 120.
-
-#define SERVERS 3
-#define CLIENTS 1
 
 #endif
