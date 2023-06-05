@@ -3,9 +3,9 @@
 #include <math.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
-#include <zephyr/logging/log.h>
+//#include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(encoder, CONFIG_ENCODER_LOG_LEVEL);
+//LOG_MODULE_REGISTER(encoder, CONFIG_ENCODER_LOG_LEVEL);
 static const struct gpio_dt_spec ChannelA_Encoder =
     GPIO_DT_SPEC_GET(DT_NODELABEL(encodercha), gpios);
 static const struct gpio_dt_spec ChannelB_Encoder =
@@ -83,7 +83,7 @@ void measure(struct k_work *work) {
   if (count % 2 == 0) {
     setAcceleration();
   }
-  LOG_DBG("Vel: %f Acc: %f", floatVel, floatAcc);
+  //LOG_DBG("Vel: %f Acc: %f", floatVel, floatAcc);
 }
 K_WORK_DEFINE(measure_work, measure);
 
@@ -133,6 +133,9 @@ void setAcceleration(void) {
 
 void encoderTestLoop(void) {
   for (int i = 1;; i++) {
+    //LOG_DBG("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(),
+           // getFloatAcc());
+    k_msleep((int32_t)(ENCODER_SAMPLE_PERIOD_MS * 1000.0f));
     LOG_DBG("Pos: %d, Vel: %.3f, Acc: %3f\n", getPosition(), getFloatVel(),
             getFloatAcc());
     k_msleep((int32_t)(ENCODER_SAMPLE_PERIOD_MS));

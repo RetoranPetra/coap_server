@@ -35,8 +35,8 @@ struct percentageStruct {
 };
 struct encoderMessage {
   int8_t nodeOrigin;
-  int32_t position;
-  int32_t velocity;
+  int32_t payload;
+  int8_t command;
   uint16_t messageNum;
 };
 
