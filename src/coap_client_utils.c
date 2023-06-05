@@ -15,6 +15,7 @@
 
 #include "coap_client_utils.h"
 #include "node.h"
+#include "zephyr/kernel.h"
 #include "zephyr/net/coap.h"
 
 LOG_MODULE_REGISTER(coap_client_utils, CONFIG_COAP_CLIENT_UTILS_LOG_LEVEL);
@@ -35,13 +36,12 @@ static struct k_work unicast_light_work;
 static struct k_work multicast_light_work;
 static struct k_work toggle_MTD_SED_work;
 static struct k_work provisioning_work;
-static struct k_work on_connect_work;
-static struct k_work on_disconnect_work;
 
 static struct k_work genericSend_work;
 static struct k_work floatSend_work;
 static struct k_work percentageSend_work;
 static struct k_work encoderSend_work;
+static struct k_work commandSend_work;
 
 // Must point to something of size GENERIC_PAYLOAD_SIZE
 static char messagePointer[GENERIC_PAYLOAD_SIZE] = {};
@@ -50,6 +50,8 @@ static struct encoderMessage encoderPointer[1] = {};
 static double floatPointer[1] = {};
 
 static struct percentageStructHidden percentagePointer[1] = {};
+static struct commandMsg cmdPointer[1] = {};
+static int cmdDoMulti = 0;
 
 mtd_mode_toggle_cb_t on_mtd_mode_toggle;
 
@@ -60,6 +62,7 @@ static const char *const generic_option[] = {GENERIC_URI_PATH, NULL};
 static const char *const float_option[] = {FLOAT_URI_PATH, NULL};
 static const char *const percentage_option[] = {PERCENTAGE_URI_PATH, NULL};
 static const char *const encoder_option[] = {ENCODER_URI_PATH, NULL};
+static const char *const cmd_option[] = {CMD_URI_PATH, NULL};
 
 /* Thread multicast mesh local address */
 static struct sockaddr_in6 multicast_local_addr = {
@@ -120,7 +123,8 @@ void serverScroll(void) {
   connectSelector++;
   connectSelector = connectSelector % SERVERS;
   serverSelector = connections[connectSelector];
-  LOG_INF("Server %i | On? %i | Addr %s", serverSelector,is_connected[serverSelector], unique_local_addr_str[serverSelector]);
+  LOG_INF("Server %i | On? %i | Addr %s", serverSelector,
+          is_connected[serverSelector], unique_local_addr_str[serverSelector]);
 }
 // m/
 
@@ -192,7 +196,8 @@ static int on_provisioning_reply(const struct coap_packet *response,
     goto exit;
   }
 
-  LOG_INF("Received peer address: %s for %d", unique_local_addr_str[serverSelector],serverSelector);
+  LOG_INF("Received peer address: %s for %d",
+          unique_local_addr_str[serverSelector], serverSelector);
 
 exit:
   if (IS_ENABLED(CONFIG_OPENTHREAD_MTD_SED)) {
@@ -247,57 +252,6 @@ static void send_provisioning_request(struct k_work *item) {
                     (const struct sockaddr *)&multicast_local_addr,
                     provisioning_option, NULL, 0u, on_provisioning_reply);
 }
-
-static void toggle_minimal_sleepy_end_device(struct k_work *item) {
-  otError error;
-  otLinkModeConfig mode;
-  struct openthread_context *context = openthread_get_default_context();
-
-  __ASSERT_NO_MSG(context != NULL);
-
-  openthread_api_mutex_lock(context);
-  mode = otThreadGetLinkMode(context->instance);
-  mode.mRxOnWhenIdle = !mode.mRxOnWhenIdle;
-  error = otThreadSetLinkMode(context->instance, mode);
-  openthread_api_mutex_unlock(context);
-
-  if (error != OT_ERROR_NONE) {
-    LOG_ERR("Failed to set MLE link mode configuration");
-  } else {
-    on_mtd_mode_toggle(mode.mRxOnWhenIdle);
-  }
-}
-
-static void update_device_state(void) {
-  struct otInstance *instance = openthread_get_default_instance();
-  otLinkModeConfig mode = otThreadGetLinkMode(instance);
-  on_mtd_mode_toggle(mode.mRxOnWhenIdle);
-}
-
-static void on_thread_state_changed(otChangedFlags flags,
-                                    struct openthread_context *ot_context,
-                                    void *user_data) {
-  if (flags & OT_CHANGED_THREAD_ROLE) {
-    switch (otThreadGetDeviceRole(ot_context->instance)) {
-    case OT_DEVICE_ROLE_CHILD:
-    case OT_DEVICE_ROLE_ROUTER:
-    case OT_DEVICE_ROLE_LEADER:
-      k_work_submit(&on_connect_work);
-      is_connected[serverSelector] = true;
-      break;
-
-    case OT_DEVICE_ROLE_DISABLED:
-    case OT_DEVICE_ROLE_DETACHED:
-    default:
-      k_work_submit(&on_disconnect_work);
-      is_connected[serverSelector] = false;
-      break;
-    }
-  }
-}
-static struct openthread_state_changed_cb ot_state_chaged_cb = {
-    .state_changed_cb = on_thread_state_changed};
-
 // m
 static void genericSend(struct k_work *item) {
   ARG_UNUSED(item);
@@ -352,11 +306,31 @@ static void encoderSend(struct k_work *item) {
     LOG_DBG("Encoder message send fail!\n");
   }
 }
+static void cmdSend(struct k_work *item) {
+  const struct sockaddr *address;
+  if (cmdDoMulti) {
+    address = (const struct sockaddr *)&multicast_local_addr;
+  } else {
+    address = (const struct sockaddr *)&unique_local_addr[serverTarget];
+  }
+  ARG_UNUSED(item);
+  if (coap_send_request(COAP_METHOD_PUT, address, cmd_option,
+                        (char *)cmdPointer, CMD_PAYLOAD_SIZE, NULL) >= 0) {
+    LOG_DBG("Cmd message send success!\n");
+  } else {
+    LOG_DBG("Cmd message send fail!\n");
+  }
+}
 // m/
 
 static void submit_work_if_connected(struct k_work *work) {
-//  if (is_connected[serverTarget]) {
-  LOG_DBG("Target is %d AKA %s",serverTarget,unique_local_addr_str[serverTarget]);
+  //  if (is_connected[serverTarget]) {
+  if (serverTarget == -1) {
+    LOG_DBG("Multicast Target!");
+  } else {
+    LOG_DBG("Target is %d AKA %s", serverTarget,
+            unique_local_addr_str[serverTarget]);
+  }
   if (true) {
     k_work_submit(work);
   } else {
@@ -386,6 +360,7 @@ void coap_client_utils_init(/*
   k_work_init(&floatSend_work, floatSend);
   k_work_init(&percentageSend_work, percentageSend);
   k_work_init(&encoderSend_work, encoderSend);
+  k_work_init(&commandSend_work, cmdSend);
 
   // openthread_state_changed_cb_register(openthread_get_default_context(),
   // &ot_state_chaged_cb); openthread_start(openthread_get_default_context());
@@ -396,7 +371,7 @@ void coap_client_utils_init(/*
           update_device_state();
   }
   */
-  serverSelector=connections[0];
+  serverSelector = connections[0];
 }
 
 void coap_client_toggle_one_light(void) {
@@ -411,13 +386,13 @@ void coap_client_send_provisioning_request(void) {
   k_work_submit(&provisioning_work);
 }
 
-void coap_client_genericSend(int server,char *msg) {
+void coap_client_genericSend(int server, char *msg) {
   memcpy(messagePointer, msg, GENERIC_PAYLOAD_SIZE);
   serverTarget = server;
   submit_work_if_connected(&genericSend_work);
 }
 
-void coap_client_floatSend(int server,double num) {
+void coap_client_floatSend(int server, double num) {
   memcpy(floatPointer, &num, sizeof(double));
   serverTarget = server;
   submit_work_if_connected(&floatSend_work);
@@ -428,7 +403,7 @@ void coap_client_toggle_minimal_sleepy_end_device(void) {
     k_work_submit(&toggle_MTD_SED_work);
   }
 }
-void coap_client_percentageSend(int server,struct percentageStruct input) {
+void coap_client_percentageSend(int server, struct percentageStruct input) {
   static uint16_t counter = 0;
   for (int i = 0; i < 3; i++) {
     percentagePointer->percentages[i] =
@@ -439,7 +414,7 @@ void coap_client_percentageSend(int server,struct percentageStruct input) {
   serverTarget = server;
   submit_work_if_connected(&percentageSend_work);
 }
-void coap_client_encoderSend(int server,struct encoderMessage input) {
+void coap_client_encoderSend(int server, struct encoderMessage input) {
   static uint16_t counter = 0;
   memcpy(encoderPointer, &input, ENCODER_PAYLOAD_SIZE);
   encoderPointer->messageNum = counter;
@@ -447,4 +422,15 @@ void coap_client_encoderSend(int server,struct encoderMessage input) {
   counter++;
   serverTarget = server;
   submit_work_if_connected(&encoderSend_work);
+}
+
+void coap_client_cmdSend(int server, struct commandMsg input) {
+  static uint16_t counter = 0;
+  cmdDoMulti = -1 == server;
+  memcpy(cmdPointer, &input, CMD_PAYLOAD_SIZE);
+  encoderPointer->messageNum = counter;
+  encoderPointer->nodeOrigin = NODE;
+  counter++;
+  serverTarget = server;
+  submit_work_if_connected(&commandSend_work);
 }

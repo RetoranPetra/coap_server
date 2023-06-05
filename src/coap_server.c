@@ -146,7 +146,57 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 }
 #endif
 
+<<<<<<< HEAD
 
+=======
+static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
+  uint32_t buttons = button_state & has_changed;
+#ifdef SERVER
+  if (buttons & DK_BTN4_MSK) {
+    k_work_submit(&provisioning_work);
+  }
+#endif
+#ifdef CLIENT
+  if (buttons & DK_BTN3_MSK) {
+    // Should toggle through server selected.
+    serverScroll();
+  }
+  if (buttons & DK_BTN2_MSK) {
+    // Should send a provisioning request.
+    coap_client_send_provisioning_request();
+  }
+  if (buttons & DK_BTN1_MSK) {
+    // coap_client_toggle_one_light();
+    // coap_client_floatSend(10.768);
+    /*
+    struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
+      .identifier = "Hello!"};
+    coap_client_percentageSend(example);
+    */
+    /*
+    struct encoderMessage example = {
+        .position = 3000, .messageNum = 0, .velocity = 20};
+    switch (NODE) {
+    case 0:
+      LOG_DBG("I'm not initiating, I'm the master!");
+      break;
+    default:
+      LOG_DBG("I'm %d, and I'll send to master!", NODE);
+      coap_client_encoderSend(0, example);
+      break;
+    }
+    */
+    struct commandMsg example = {
+      .cmd = 0,
+      .datum1 = 100,
+      .datum2 = 200,
+      .datum3 = 300
+    };
+    coap_client_cmdSend(-1,example);
+  }
+#endif
+}
+>>>>>>> origin/client
 #ifdef SERVER
 static void on_thread_state_changed(otChangedFlags flags,
                                     struct openthread_context *ot_context,
@@ -351,6 +401,9 @@ static void on_encoder_request(struct encoderMessage encode) {
   }
   newMessage = true;
 }
+static void on_cmd_request(struct commandMsg cmd) {
+  LOG_DBG("CMD CALLBACK!");
+}
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
@@ -437,7 +490,7 @@ void main(void)
 
   ret = ot_coap_init(&deactivate_provisionig, &on_light_request,
                      &on_generic_request, &on_float_request,
-                     &on_percentage_request, &on_encoder_request);
+                     &on_percentage_request, &on_encoder_request, &on_cmd_request);
   if (ret) {
     LOG_ERR("Could not initialize OpenThread CoAP");
     goto end;
@@ -473,6 +526,7 @@ void main(void)
   Setup_interrupt();
 #endif /* ifdef ENCODER */
 
+<<<<<<< HEAD
 	// uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
 	per_c = period/1000000000.0;  //ns to s
 	//float ySteps = 0;
@@ -741,4 +795,13 @@ void main(void)
 	}
 
   end: return;
+=======
+  // Auto channel stuff
+  otInstance *inst = openthread_get_default_instance();
+  otChannelManagerSetAutoChannelSelectionEnabled(inst, false);
+  // Seems to not work.
+  goto start;
+end:
+  return;
+>>>>>>> origin/client
 }

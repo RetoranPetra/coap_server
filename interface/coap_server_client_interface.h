@@ -39,11 +39,20 @@ struct encoderMessage {
   int8_t command;
   uint16_t messageNum;
 };
-
+struct commandMsg {
+  uint8_t cmd;
+  int8_t nodeOrigin;
+  uint32_t datum1;
+  uint32_t datum2;
+  uint32_t datum3;
+  uint16_t msgNum;
+};
 // Payload size seems to be limited to https://stackoverflow.com/questions/42203857/how-much-data-can-hold-coap-in-single-message 127 bytes.
 
 #define PROVISIONING_URI_PATH "provisioning"
 
+#define CMD_URI_PATH "cmd"
+#define CMD_PAYLOAD_SIZE sizeof(struct commandMsg)
 
 #define LIGHT_URI_PATH "light"
 #define LIGHT_PAYLOAD_SIZE 1
