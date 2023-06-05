@@ -39,7 +39,6 @@ struct encoderMessage {
   int32_t velocity;
   uint16_t messageNum;
 };
-//TODO: Implement this with a multicast toggle.
 struct commandMsg {
   uint8_t cmd;
   int8_t nodeOrigin;
