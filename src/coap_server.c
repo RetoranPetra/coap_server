@@ -61,8 +61,8 @@
 #define invPolarity 1
 #define readPolarity -1
 
-bool mainloop = false;
 bool newMessage = false;
+bool mainloop = false;
 bool inPrinting = false;
 
 
