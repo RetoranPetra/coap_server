@@ -236,16 +236,23 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 
 		//Defining responses:
 		if(evt->data.rx.buf[evt->data.rx.offset] == 'w'){
-			printk("Upwards \n");
+			LOG_DBG("Upwards \n");
 			ierr = 0;
 			yTargetSteps = 2500;
-			struct encoderMessage example = {.payload = yTargetSteps,
-			.messageNum=0,.command=70};
-			coap_client_encoderSend(1,example);
+			// struct encoderMessage example = {.payload = yTargetSteps,
+			// .messageNum=0,.command=70};
+			// coap_client_encoderSend(1,example);
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 70,
+			  .datum2 = yTargetSteps,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
 			//Up code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'a'){
-			printk("Left \n");
+			LOG_DBG("Left \n");
 			struct encoderMessage example = {.payload = 3000,
 			.messageNum=0,.command=69};
 			coap_client_encoderSend(1,example);
@@ -253,50 +260,56 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			//Left code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 's'){
-			printk("Downwards \n");
+			LOG_DBG("Downwards \n");
 			ierr = 0;
 			yTargetSteps = 500;
-			struct encoderMessage example = {.payload = yTargetSteps,
-			.messageNum=0,.command=70};
-			coap_client_encoderSend(1,example);
+			// struct encoderMessage example = {.payload = yTargetSteps,
+			// .messageNum=0,.command=70};
+			// coap_client_encoderSend(1,example);
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 70,
+			  .datum2 = yTargetSteps,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
 			//Down code uart					
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'd'){
-			printk("Right \n");
-
+			LOG_DBG("Right \n");
 			//Right code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '='){
 			kD = kD + 5;
-			printf("Kd+ is now %f \n",kD);
+			LOG_DBG("Kd+ is now %f \n",kD);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '-'){
 			kD = kD - 5;
-			printf("Kd- is now %f \n",kD);
+			LOG_DBG("Kd- is now %f \n",kD);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '0'){
 			kP = kP + 0.1*pi/3000;
-			printf("Kp+ is now %f \n",kP);
+			LOG_DBG("Kp+ is now %f \n",kP);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '9'){
 			kP = kP - 0.1*pi/3000;
-			printf("Kp- is now %f \n",kP);
+			LOG_DBG("Kp- is now %f \n",kP);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '8'){
 			kI = kI + 2.0/1000.0;
-			printf("KI+ is now %f \n",kI);
+			LOG_DBG("KI+ is now %f \n",kI);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '7'){
 			kI = kI - 2.0/1000.0;
-			printf("KI- is now %f \n",kI);
+			LOG_DBG("KI- is now %f \n",kI);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 't'){
-			printk("Target 0 \n");
+			LOG_DBG("Target 0 \n");
 			ierr = 0;
 			yTargetSteps = 0;
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'b'){
-			printk("Target middle \n");
+			LOG_DBG("Target middle \n");
 			ierr = 0;
 			yTargetSteps = 1500;
 		}
@@ -305,22 +318,42 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '['){
 			MIN_PER -= 10000;
-			printf("MIN_PER- is now %u \n",MIN_PER);
+			LOG_DBG("MIN_PER- is now %u \n",MIN_PER);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == ']'){
 			MIN_PER += 10000;
-			printf("MIN_PER+ is now %u \n",MIN_PER);
+			LOG_DBG("MIN_PER+ is now %u \n",MIN_PER);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'r'){
 			resetPosition(0);
 			ySteps = 0;
-			printf("Reset position to 0");
+			LOG_DBG("Reset position to 0");
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == ' '){
-			printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d, uptime = %u, oldtime = %u\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore,uptime, oldtime);
+			LOG_DBG("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d, uptime = %u, oldtime = %u\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore,uptime, oldtime);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'p'){
-			printf("per_c = %f, a = %f, P = %f, I = %f, D = %f\n",per_c,a,kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed);
+			LOG_DBG("per_c = %f, a = %f, P = %f, I = %f, D = %f\n",per_c,a,kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '1'){
+			LOG_DBG("All start\n");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 69,
+			  .datum2 = yTargetSteps,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+			mainloop = true;
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '2'){
+			coap_client_send_provisioning_request();
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '3'){
+			serverScroll();
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '4'){
+			k_work_submit(&provisioning_work);
 		}
 		}
 
