@@ -107,6 +107,8 @@ void Setup_interrupt(void) {
   k_timer_start(&measureTime, K_SECONDS(0), K_MSEC(ENCODER_SAMPLE_PERIOD_MS));
 }
 
+void resetPosition(int32_t in) { position = in; return; }
+
 int32_t getPosition(void) { return position; }
 // TODO: setVelocity/setAcceleration should do calculations based on the REAL
 // time not the time it thinks has passed. E.I. record time and get difference
