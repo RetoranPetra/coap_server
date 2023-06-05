@@ -89,7 +89,7 @@
 #define G 9.80665
 #define PI 3.14159265359
 #define DISTANCE_PER_STEP 2.0 * PI * 8.5E-3 / 200.0
-#define SAMPLING_PERIOD 100 // in microsecs
+#define SAMPLING_PERIOD 100 // in millisecs
 #define GYROMEASERROR 0.5
 #define BETA sqrt(3.0f / 4.0f) * GYROMEASERROR // compute BETA
 static const struct gpio_dt_spec Reset_Pin =
