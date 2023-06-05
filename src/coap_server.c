@@ -146,57 +146,14 @@ static void on_led_timer_stop(struct k_timer *timer_id) {
 }
 #endif
 
-<<<<<<< HEAD
+// struct commandMsg example = {
+//   .cmd = 0,
+//   .datum1 = 100,
+//   .datum2 = 200,
+//   .datum3 = 300
+// };
+// coap_client_cmdSend(-1,example);
 
-=======
-static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
-  uint32_t buttons = button_state & has_changed;
-#ifdef SERVER
-  if (buttons & DK_BTN4_MSK) {
-    k_work_submit(&provisioning_work);
-  }
-#endif
-#ifdef CLIENT
-  if (buttons & DK_BTN3_MSK) {
-    // Should toggle through server selected.
-    serverScroll();
-  }
-  if (buttons & DK_BTN2_MSK) {
-    // Should send a provisioning request.
-    coap_client_send_provisioning_request();
-  }
-  if (buttons & DK_BTN1_MSK) {
-    // coap_client_toggle_one_light();
-    // coap_client_floatSend(10.768);
-    /*
-    struct percentageStruct example = {.percentages = {1.0,1.0,1.0},
-      .identifier = "Hello!"};
-    coap_client_percentageSend(example);
-    */
-    /*
-    struct encoderMessage example = {
-        .position = 3000, .messageNum = 0, .velocity = 20};
-    switch (NODE) {
-    case 0:
-      LOG_DBG("I'm not initiating, I'm the master!");
-      break;
-    default:
-      LOG_DBG("I'm %d, and I'll send to master!", NODE);
-      coap_client_encoderSend(0, example);
-      break;
-    }
-    */
-    struct commandMsg example = {
-      .cmd = 0,
-      .datum1 = 100,
-      .datum2 = 200,
-      .datum3 = 300
-    };
-    coap_client_cmdSend(-1,example);
-  }
-#endif
-}
->>>>>>> origin/client
 #ifdef SERVER
 static void on_thread_state_changed(otChangedFlags flags,
                                     struct openthread_context *ot_context,
@@ -293,14 +250,14 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			yTargetSteps = 2500;
 			struct encoderMessage example = {.payload = yTargetSteps,
 			.messageNum=0,.command=70};
-			coap_client_encoderSend(example);
+			coap_client_encoderSend(1,example);
 			//Up code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'a'){
 			printk("Left \n");
 			struct encoderMessage example = {.payload = 3000,
 			.messageNum=0,.command=69};
-			coap_client_encoderSend(example);
+			coap_client_encoderSend(1,example);
 			mainloop = true;
 			//Left code uart
 		}
@@ -310,7 +267,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			yTargetSteps = 500;
 			struct encoderMessage example = {.payload = yTargetSteps,
 			.messageNum=0,.command=70};
-			coap_client_encoderSend(example);
+			coap_client_encoderSend(1,example);
 			//Down code uart					
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'd'){
@@ -400,9 +357,6 @@ static void on_encoder_request(struct encoderMessage encode) {
 	yTargetSteps = currentEncode.payload;
   }
   newMessage = true;
-}
-static void on_cmd_request(struct commandMsg cmd) {
-  LOG_DBG("CMD CALLBACK!");
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
@@ -526,50 +480,6 @@ void main(void)
   Setup_interrupt();
 #endif /* ifdef ENCODER */
 
-<<<<<<< HEAD
-	// uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
-	per_c = period/1000000000.0;  //ns to s
-	//float ySteps = 0;
-	// float oldySteps = 0;
-	// float yTargetSteps = 1500;
-	// float ySpeed = 0;
-	// float ierr = 0;
-	//int ret;
-	// int dir = 1;
-	// double a = 0;
-	// double accel = 0;
-	// double delta_phi = delta_phi_start;
-	// double placeholder = period;
-	// double flip = 0;
-	// int notMovingCounter = 0;
-	// uint32_t uptime = k_uptime_ticks();
-	// uint32_t oldtime = 0;
-	printk("Uptime is %u\n",uptime);
-
-	if (!device_is_ready(P0)) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, step_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, dir_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, mode2_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, mode1_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
 	ret = gpio_pin_configure(P0, mode0_pin, GPIO_OUTPUT_INACTIVE);
 	if (ret < 0) {
 		return;
@@ -578,17 +488,17 @@ void main(void)
 	//UART callback function registered
 	ret = uart_callback_set(uart, uart_cb, NULL);
 		if (ret) {
-			return 1;
+			return;
 		}
 	//Data sent over UART
 	ret = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
 	if (ret) {
-		return 1;
+		return;
 	}	
 	//uart_rx_enable() call to start receiving
 	ret = uart_rx_enable(uart ,rx_buf,sizeof rx_buf,RECEIVE_TIMEOUT);
 	if (ret) {
-		return 1;
+		return;
 	}
 
 	printk("Uart is setup \n");
@@ -613,24 +523,24 @@ void main(void)
 			goto restart;
 		}
 		//Uncomment for utilising Antiblock Measures
-		// if(notMovingCounter> 100 && ((ySteps + dir*5<yTargetSteps-10) || (ySteps + dir*5>yTargetSteps+10))){
-		// 	step_semaphore = 64;
-		// 	for(i = 0; i<5; i++){
-		// 		gpio_pin_set(P0, step_pin, 1);
+		if(notMovingCounter> 100 && ((ySteps + dir*5<yTargetSteps-10) || (ySteps + dir*5>yTargetSteps+10))){
+			step_semaphore = 64;
+			for(i = 0; i<5; i++){
+				gpio_pin_set(P0, step_pin, 1);
 
-		// 		k_sleep(K_MSEC(10));
+				k_sleep(K_MSEC(10));
 
-		// 		gpio_pin_set(P0, step_pin, 0);
+				gpio_pin_set(P0, step_pin, 0);
 
-		// 		k_sleep(K_MSEC(10));
+				k_sleep(K_MSEC(10));
 
-		// 		//ySteps = ySteps + 1.0*dir/scalar;
-		// 	}
-		// 	printf("Antiblock measures\n");
-		// 	period = period*10;
-		// 	per_c = per_c*10;
-		// 	notMovingCounter = 0;
-		// }
+				//ySteps = ySteps + 1.0*dir/scalar;
+			}
+			printf("Antiblock measures\n");
+			period = period*10;
+			per_c = per_c*10;
+			notMovingCounter = 0;
+		}
 
 		not_done_stepping:
 		
@@ -748,60 +658,50 @@ void main(void)
 			//printf("Should have theoretically stopped, per_c = %f\n",per_c);
 		}
 
-		// if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
-		// 	scalar = scalar*2U;  //gear down
-		// }
-		// else{
-		// 	if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
-		// 		scalar = scalar/2U;
-		// 		if(scalar < 1U) scalar = 1U;
-		// }
-		// switch(scalar){
-		// 	case 1U:
-		// 		gpio_pin_set(P0, mode2_pin, 0);
-		// 		gpio_pin_set(P0, mode1_pin, 0);
-		// 		gpio_pin_set(P0, mode0_pin, 0);
-		// 		break;
-		// 	case 2U:
-		// 		gpio_pin_set(P0, mode2_pin, 0);
-		// 		gpio_pin_set(P0, mode1_pin, 0);
-		// 		gpio_pin_set(P0, mode0_pin, 1);
-		// 		break;
-		// 	case 4U:
-		// 		gpio_pin_set(P0, mode2_pin, 0);
-		// 		gpio_pin_set(P0, mode1_pin, 1);
-		// 		gpio_pin_set(P0, mode0_pin, 0);
-		// 		break;
-		// 	case 8U:
-		// 		gpio_pin_set(P0, mode2_pin, 0);
-		// 		gpio_pin_set(P0, mode1_pin, 1);
-		// 		gpio_pin_set(P0, mode0_pin, 1);
-		// 		break;
-		// 	case 16U:
-		// 		gpio_pin_set(P0, mode2_pin, 1);
-		// 		gpio_pin_set(P0, mode1_pin, 0);
-		// 		gpio_pin_set(P0, mode0_pin, 0);
-		// 		break;
-		// 	case 32U:
-		// 		gpio_pin_set(P0, mode2_pin, 1);
-		// 		gpio_pin_set(P0, mode1_pin, 0);
-		// 		gpio_pin_set(P0, mode0_pin, 1);
-		// 		break;
-		// 	default:
-		// 		//printk("Scalar is wrong\n");
-		// 	break;
-		// }
-	//}
+		if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
+			scalar = scalar*2U;  //gear down
+		}
+		else{
+			if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
+				scalar = scalar/2U;
+				if(scalar < 1U) scalar = 1U;
+		}
+		switch(scalar){
+			case 1U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 0);
+				break;
+			case 2U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 1);
+				break;
+			case 4U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 1);
+				gpio_pin_set(P0, mode0_pin, 0);
+				break;
+			case 8U:
+				gpio_pin_set(P0, mode2_pin, 0);
+				gpio_pin_set(P0, mode1_pin, 1);
+				gpio_pin_set(P0, mode0_pin, 1);
+				break;
+			case 16U:
+				gpio_pin_set(P0, mode2_pin, 1);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 0);
+				break;
+			case 32U:
+				gpio_pin_set(P0, mode2_pin, 1);
+				gpio_pin_set(P0, mode1_pin, 0);
+				gpio_pin_set(P0, mode0_pin, 1);
+				break;
+			default:
+				//printk("Scalar is wrong\n");
+			break;
+		}
 	}
 
   end: return;
-=======
-  // Auto channel stuff
-  otInstance *inst = openthread_get_default_instance();
-  otChannelManagerSetAutoChannelSelectionEnabled(inst, false);
-  // Seems to not work.
-  goto start;
-end:
-  return;
->>>>>>> origin/client
 }
