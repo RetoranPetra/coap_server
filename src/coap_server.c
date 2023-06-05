@@ -525,17 +525,17 @@ void main(void)
 	//UART callback function registered
 	ret = uart_callback_set(uart, uart_cb, NULL);
 		if (ret) {
-			return 1;
+			return;
 		}
 	//Data sent over UART
 	ret = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
 	if (ret) {
-		return 1;
+		return;
 	}	
 	//uart_rx_enable() call to start receiving
 	ret = uart_rx_enable(uart ,rx_buf,sizeof rx_buf,RECEIVE_TIMEOUT);
 	if (ret) {
-		return 1;
+		return;
 	}
 
 	printk("Uart is setup \n");
