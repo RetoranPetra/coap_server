@@ -241,14 +241,14 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			yTargetSteps = 2500;
 			struct encoderMessage example = {.payload = yTargetSteps,
 			.messageNum=0,.command=70};
-			coap_client_encoderSend(example);
+			coap_client_encoderSend(1,example);
 			//Up code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'a'){
 			printk("Left \n");
 			struct encoderMessage example = {.payload = 3000,
 			.messageNum=0,.command=69};
-			coap_client_encoderSend(example);
+			coap_client_encoderSend(1,example);
 			mainloop = true;
 			//Left code uart
 		}
@@ -258,7 +258,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			yTargetSteps = 500;
 			struct encoderMessage example = {.payload = yTargetSteps,
 			.messageNum=0,.command=70};
-			coap_client_encoderSend(example);
+			coap_client_encoderSend(1,example);
 			//Down code uart					
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'd'){
@@ -353,6 +353,7 @@ static void on_encoder_request(struct encoderMessage encode) {
 
 static void on_cmd_request(struct commandMsg cmd) {
   LOG_DBG("CMD CALLBACK!");
+}
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
@@ -371,7 +372,7 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
     //serverScroll();
 	 struct encoderMessage example = {.payload = 3000,
       .messageNum=0,.command=69};
-    coap_client_encoderSend(example);
+    coap_client_encoderSend(1,example);
 	mainloop = true;
   }
   if (buttons & DK_BTN2_MSK) {
