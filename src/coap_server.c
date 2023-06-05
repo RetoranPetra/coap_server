@@ -219,9 +219,9 @@ float ySteps = 0;
 bool firstTimeAchieve = true;
 int step_semaphore = -1;
 
-float kP = 2.0*pi/3000.0;
-float kD = -200;
-float kI = 100.0/1000.0;
+float kP = 0.003875;//2.0*pi/3000.0;
+float kD = 270.0;//70;
+float kI = 0.072;//24.0/1000.0;
 
 // float kP = 20.0*pi/3000.0;
 // float kD = -1050;
@@ -242,10 +242,16 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			printk("Upwards \n");
 			ierr = 0;
 			yTargetSteps = 2500;
+			struct encoderMessage example = {.payload = yTargetSteps,
+			.messageNum=0,.command=70};
+			coap_client_encoderSend(example);
 			//Up code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'a'){
 			printk("Left \n");
+			struct encoderMessage example = {.payload = 3000,
+			.messageNum=0,.command=69};
+			coap_client_encoderSend(example);
 			mainloop = true;
 			//Left code uart
 		}
@@ -253,6 +259,9 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			printk("Downwards \n");
 			ierr = 0;
 			yTargetSteps = 500;
+			struct encoderMessage example = {.payload = yTargetSteps,
+			.messageNum=0,.command=70};
+			coap_client_encoderSend(example);
 			//Down code uart					
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'd'){
@@ -261,12 +270,41 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			//Right code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '='){
-			kD = kD + 50;
+			kD = kD + 5;
 			printf("Kd+ is now %f \n",kD);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '-'){
-			kD = kD - 50;
+			kD = kD - 5;
 			printf("Kd- is now %f \n",kD);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '0'){
+			kP = kP + 0.1*pi/3000;
+			printf("Kp+ is now %f \n",kP);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '9'){
+			kP = kP - 0.1*pi/3000;
+			printf("Kp- is now %f \n",kP);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '8'){
+			kI = kI + 2.0/1000.0;
+			printf("KI+ is now %f \n",kI);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '7'){
+			kI = kI - 2.0/1000.0;
+			printf("KI- is now %f \n",kI);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 't'){
+			printk("Target 0 \n");
+			ierr = 0;
+			yTargetSteps = 0;
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'b'){
+			printk("Target middle \n");
+			ierr = 0;
+			yTargetSteps = 1500;
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'x'){
+			mainloop = false;
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '['){
 			MIN_PER -= 10000;
@@ -282,7 +320,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			printf("Reset position to 0");
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == ' '){
-			printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore);
+			printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d, uptime = %u, oldtime = %u\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore,uptime, oldtime);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'p'){
 			printf("per_c = %f, a = %f, P = %f, I = %f, D = %f\n",per_c,a,kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed);
@@ -309,6 +347,9 @@ static void on_encoder_request(struct encoderMessage encode) {
   currentEncode = encode;
   if(currentEncode.command == 69){
 	mainloop = true;
+  }
+  if(currentEncode.command == 70){
+	yTargetSteps = currentEncode.payload;
   }
   newMessage = true;
 }
@@ -505,6 +546,8 @@ void main(void)
 	printk("Control Wirelessly Correct\n");
 	k_sleep(K_NSEC(2000U*1000U*1000U));
 
+
+	restart:
 	while(!mainloop){
 		k_sleep(K_NSEC(2000U));
 	}
@@ -513,24 +556,28 @@ void main(void)
 
 	while (1) {		
 		//delta_phi = delta_phi_start/scalar;
-
-		if(notMovingCounter> 100 && ((ySteps + dir*3<yTargetSteps-10) || (ySteps + dir*3>yTargetSteps+10))){
-			for(i = 0; i<3; i++){
-				gpio_pin_set(P0, step_pin, 1);
-
-				k_sleep(K_MSEC(10));
-
-				gpio_pin_set(P0, step_pin, 0);
-
-				k_sleep(K_MSEC(10));
-
-				//ySteps = ySteps + 1.0*dir/scalar;
-			}
-			printf("Antiblock measures\n");
-			period = period*10;
-			per_c = per_c*10;
-			notMovingCounter = 0;
+		if(mainloop == false){
+			goto restart;
 		}
+		//Uncomment for utilising Antiblock Measures
+		// if(notMovingCounter> 100 && ((ySteps + dir*5<yTargetSteps-10) || (ySteps + dir*5>yTargetSteps+10))){
+		// 	step_semaphore = 64;
+		// 	for(i = 0; i<5; i++){
+		// 		gpio_pin_set(P0, step_pin, 1);
+
+		// 		k_sleep(K_MSEC(10));
+
+		// 		gpio_pin_set(P0, step_pin, 0);
+
+		// 		k_sleep(K_MSEC(10));
+
+		// 		//ySteps = ySteps + 1.0*dir/scalar;
+		// 	}
+		// 	printf("Antiblock measures\n");
+		// 	period = period*10;
+		// 	per_c = per_c*10;
+		// 	notMovingCounter = 0;
+		// }
 
 		not_done_stepping:
 		
@@ -556,7 +603,7 @@ void main(void)
 		oldySteps = ySteps;
 		olderror = error;
     	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;//*currentEncode.position/MAXENCODER;//
-		error = (yTargetSteps - ySteps);
+		error = yTargetSteps - ySteps;
 
 		if( oldySteps == ySteps ){
 			notMovingCounter++;
@@ -576,8 +623,9 @@ void main(void)
 		}
 
 		ierr = ierr + error/3000.0*(uptime-oldtime)/32786.0*5;
-		if(kI*ierr > 20)
+		if(kI*ierr > 20){
 			ierr = 20.0/kI;
+		}
 		if(kI*ierr < -20){
 			ierr = -20.0/kI;
 		}
@@ -588,7 +636,18 @@ void main(void)
 		// 	flip = 0;
 		// }
 
-		a = kP*(yTargetSteps-ySteps) + kD*ySpeed + kI*ierr;
+		//yTargetstepsex = 1500 , yStepsex = 500; ySteps2 = 1000
+		//then error = 1000, error2 = 500 ySpeed = -500  ierr = 200
+		//a = 2*1000 + 200*-500 + 200/1000 = +Number slowed down by D
+
+		//yTargetstepsex = 1500 , yStepsex = 2000; ySteps2 = 2500
+		//then error = -500, error2 = -1000 ySpeed = -500  ierr = -200
+		//a = 2*-500 + 200*-500 + -200/1000
+
+		//Target = 500, ySteps = 2000 ysteps
+		//then error = -1500, error
+
+		a = kP*error + kD*ySpeed + kI*ierr;
 		if(a > 20)
 			a = 20;
 		if(a < -20)
@@ -636,49 +695,49 @@ void main(void)
 			//printf("Should have theoretically stopped, per_c = %f\n",per_c);
 		}
 
-		if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
-			scalar = scalar*2U;  //gear down
-		}
-		else{
-			if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
-				scalar = scalar/2U;
-				if(scalar < 1U) scalar = 1U;
-		}
-		switch(scalar){
-			case 1U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 0);
-				break;
-			case 2U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 1);
-				break;
-			case 4U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 1);
-				gpio_pin_set(P0, mode0_pin, 0);
-				break;
-			case 8U:
-				gpio_pin_set(P0, mode2_pin, 0);
-				gpio_pin_set(P0, mode1_pin, 1);
-				gpio_pin_set(P0, mode0_pin, 1);
-				break;
-			case 16U:
-				gpio_pin_set(P0, mode2_pin, 1);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 0);
-				break;
-			case 32U:
-				gpio_pin_set(P0, mode2_pin, 1);
-				gpio_pin_set(P0, mode1_pin, 0);
-				gpio_pin_set(P0, mode0_pin, 1);
-				break;
-			default:
-				//printk("Scalar is wrong\n");
-			break;
-		}
+		// if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
+		// 	scalar = scalar*2U;  //gear down
+		// }
+		// else{
+		// 	if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
+		// 		scalar = scalar/2U;
+		// 		if(scalar < 1U) scalar = 1U;
+		// }
+		// switch(scalar){
+		// 	case 1U:
+		// 		gpio_pin_set(P0, mode2_pin, 0);
+		// 		gpio_pin_set(P0, mode1_pin, 0);
+		// 		gpio_pin_set(P0, mode0_pin, 0);
+		// 		break;
+		// 	case 2U:
+		// 		gpio_pin_set(P0, mode2_pin, 0);
+		// 		gpio_pin_set(P0, mode1_pin, 0);
+		// 		gpio_pin_set(P0, mode0_pin, 1);
+		// 		break;
+		// 	case 4U:
+		// 		gpio_pin_set(P0, mode2_pin, 0);
+		// 		gpio_pin_set(P0, mode1_pin, 1);
+		// 		gpio_pin_set(P0, mode0_pin, 0);
+		// 		break;
+		// 	case 8U:
+		// 		gpio_pin_set(P0, mode2_pin, 0);
+		// 		gpio_pin_set(P0, mode1_pin, 1);
+		// 		gpio_pin_set(P0, mode0_pin, 1);
+		// 		break;
+		// 	case 16U:
+		// 		gpio_pin_set(P0, mode2_pin, 1);
+		// 		gpio_pin_set(P0, mode1_pin, 0);
+		// 		gpio_pin_set(P0, mode0_pin, 0);
+		// 		break;
+		// 	case 32U:
+		// 		gpio_pin_set(P0, mode2_pin, 1);
+		// 		gpio_pin_set(P0, mode1_pin, 0);
+		// 		gpio_pin_set(P0, mode0_pin, 1);
+		// 		break;
+		// 	default:
+		// 		//printk("Scalar is wrong\n");
+		// 	break;
+		// }
 	//}
 	}
 
