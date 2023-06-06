@@ -199,7 +199,6 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		//Defining responses:
 		if(evt->data.rx.buf[evt->data.rx.offset] == 'w'){
 			LOG_DBG("Upwards \n");
-			ierr = 0;
 			yTargetSteps = 2500;
 			// struct encoderMessage example = {.payload = yTargetSteps,
 			// .messageNum=0,.command=70};
@@ -223,7 +222,6 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 's'){
 			LOG_DBG("Downwards \n");
-			ierr = 0;
 			yTargetSteps = 500;
 			// struct encoderMessage example = {.payload = yTargetSteps,
 			// .messageNum=0,.command=70};
