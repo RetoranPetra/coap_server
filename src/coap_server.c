@@ -58,7 +58,7 @@
 
 #define RECEIVE_TIMEOUT 100
 
-#define invPolarity 1
+#define invPolarity -1
 #define readPolarity -1
 
 bool newMessage = false;
@@ -194,8 +194,8 @@ static uint8_t tx_buf[] =   {"nRF Connect SDK Fundamentals Course\n\r"
 static uint8_t rx_buf[10] = {0}; //Buffer size set to 10
 
 int posindex = 0;
-int yTarget[] = {0,1500,2500};
-int xTarget[] = {0,2500,0};
+int yTarget[] = {500,1500,2500};
+int xTarget[] = {500,2500,500};
 
 uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
 uint32_t MIN_PER = 2500000;
@@ -394,9 +394,21 @@ static void on_encoder_request(struct encoderMessage encode) {
 
 static void on_cmd_request(struct commandMsg cmd) {
 	if(cmd.datum1 == NODE){
-		yTargetSteps = cmd.datum2;
+		
 	}
 	switch(cmd.datum1){
+		case 1:
+			if(NODE == MIDX){
+				yTargetSteps = cmd.datum2;
+				LOG_DBG("I have changed target to %d",cmd.datum2);
+			}
+			break;
+		case 2:
+			if(NODE == RIGHTY || NODE == LEFTY){
+				yTargetSteps = cmd.datum2;
+				LOG_DBG("I have changed target to %d",cmd.datum2);
+			}
+			break;
 		case 69:
 			mainloop = true;
 			break;
@@ -507,7 +519,7 @@ void main(void)
 #ifdef SERVER
   int ret;
 
-  LOG_INF("Start CoAP-server sample");
+  LOG_INF("Start CoAP-server sample with Node %d",NODE);
 
   k_timer_init(&led_timer, on_led_timer_expiry, on_led_timer_stop);
   k_timer_init(&provisioning_timer, on_provisioning_timer_expiry, NULL);
@@ -668,7 +680,7 @@ void main(void)
 		if(ySteps - 100 < yTargetSteps && yTargetSteps < ySteps + 100 && per_c > 0.5)
 		{
 			LOG_DBG("Target Reached \n");
-			struct commandMsg cmd = {.datum1 = 100, .datum3 = NODE};
+			struct commandMsg cmd = {.datum1 = 100, .datum2 = yTargetSteps ,.datum3 = NODE};
 			coap_client_cmdSend(CCU, cmd);
 			if(per_c > 0.8) k_sleep(K_MSEC(300));
 		}
