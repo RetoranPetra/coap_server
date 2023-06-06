@@ -42,24 +42,11 @@
 #include <math.h>
 /* 1000 nsec = 1 usec */
 //#define MIN_PER 1000000 //1 ms
-#define GEAR_PER 10000000//2000000//
-#define GEAR_GUARD 400000
-#define MAX_PER 10000000000
 #define full_length_in_steps 3000
 #define pi 3.14159265
-#define step_pin 29
-#define dir_pin 30
-#define mode2_pin 5
-#define mode1_pin 1
-#define mode0_pin 0
-#define delta_phi_start 0.01570796326//pi/2/100;
 #define MAXENCODER 30000.0
-#define maxRecord 300
 
 #define RECEIVE_TIMEOUT 100
-
-#define invPolarity 1
-#define readPolarity -1
 
 bool newMessage = false;
 bool mainloop = false;
@@ -197,37 +184,7 @@ int posindex = 0;
 int yTarget[] = {0,1500,2500};
 int xTarget[] = {0,2500,0};
 
-uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
-uint32_t MIN_PER = 2500000;
-double per_c = 0;
-float oldySteps = 0;
 float yTargetSteps = 1500;
-uint8_t scalar = 1U;
-int TEMPORARY = 0;
-float ySpeed = 0;
-float error = 0;
-float olderror = 0;
-float ierr = 0;
-int dir = 1;
-double a = 0;
-double accel = 0;
-double delta_phi = delta_phi_start;
-double placeholder = 0;
-double flip = 0;
-int notMovingCounter = 0;
-uint32_t uptime = 0;
-uint32_t oldtime = 0;
-float ySteps = 0;
-bool firstTimeAchieve = true;
-int step_semaphore = -1;
-
-float kP = 0.003875;//2.0*pi/3000.0;
-float kD = 270.0;//70;
-float kI = 0.072;//24.0/1000.0;
-
-// float kP = 20.0*pi/3000.0;
-// float kD = -1050;
-// float kI = 1.0/1000.0;
 
 int i = 0;
 
@@ -284,54 +241,19 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			LOG_DBG("Right \n");
 			//Right code uart
 		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '='){
-			kD = kD + 5;
-			LOG_DBG("Kd+ is now %f \n",kD);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '-'){
-			kD = kD - 5;
-			LOG_DBG("Kd- is now %f \n",kD);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '0'){
-			kP = kP + 0.1*pi/3000;
-			LOG_DBG("Kp+ is now %f \n",kP);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '9'){
-			kP = kP - 0.1*pi/3000;
-			LOG_DBG("Kp- is now %f \n",kP);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '8'){
-			kI = kI + 2.0/1000.0;
-			LOG_DBG("KI+ is now %f \n",kI);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '7'){
-			kI = kI - 2.0/1000.0;
-			LOG_DBG("KI- is now %f \n",kI);
-		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 't'){
 			LOG_DBG("Target 0 \n");
-			ierr = 0;
 			yTargetSteps = 0;
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'b'){
 			LOG_DBG("Target middle \n");
-			ierr = 0;
 			yTargetSteps = 1500;
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'x'){
 			mainloop = false;
 		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '['){
-			MIN_PER -= 10000;
-			LOG_DBG("MIN_PER- is now %u \n",MIN_PER);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == ']'){
-			MIN_PER += 10000;
-			LOG_DBG("MIN_PER+ is now %u \n",MIN_PER);
-		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'r'){
 			resetPosition(0);
-			ySteps = 0;
 			LOG_DBG("Reset position to 0");
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == ' '){
@@ -402,7 +324,6 @@ static void on_cmd_request(struct commandMsg cmd) {
 			break;
 		case 70:
 			yTargetSteps = cmd.datum2;
-			ierr = 0;
 			break;
 		case 100:
 			if(NODE == CCU){
@@ -463,41 +384,10 @@ static void on_button_changed(uint32_t button_state, uint32_t has_changed) {
       .identifier = "Hello!"};
     coap_client_percentageSend(example);
     */
-   printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore);
-   mainloop = true;
+    mainloop = true;
   }
 #endif
 }
-
-void step_work_handler(struct k_work *work)
-{
-	if(step_semaphore < 2*scalar){
-		TEMPORARY++;
-		//printk("I am stepping for %d\n", TEMPORARY);
-		if(step_semaphore%2 == 0){
-			gpio_pin_set(P0, step_pin, 1);}
-		else{
-			gpio_pin_set(P0, step_pin, 0);}
-		
-		step_semaphore++;
-	}
-	// for(i = 0; i<scalar; i++){
-	// 	gpio_pin_set(P0, step_pin, 1);
-
-	// 	k_sleep(K_NSEC(period/scalar/2U));
-
-	// 	gpio_pin_set(P0, step_pin, 0);
-
-	// 	k_sleep(K_NSEC(period/scalar/2U));
-	// }
-}
-K_WORK_DEFINE(step_work, step_work_handler);
-
-void step_timer_handler(struct k_timer *timer_id)
-{
-	k_work_submit(&step_work);
-}
-K_TIMER_DEFINE(step_timer, step_timer_handler, NULL);
 
 
 void main(void)
@@ -507,7 +397,7 @@ void main(void)
 #ifdef SERVER
   int ret;
 
-  LOG_INF("Start CoAP-server sample");
+  LOG_INF("Start CoAP-server sample with Node %d",NODE);
 
   k_timer_init(&led_timer, on_led_timer_expiry, on_led_timer_stop);
   k_timer_init(&provisioning_timer, on_provisioning_timer_expiry, NULL);
@@ -545,58 +435,8 @@ void main(void)
   coap_client_utils_init();
   LOG_DBG("Passed client start in main!");
 #endif /* ifdef CLIENT */
-#ifdef IMU
-  ICM20600_startup();
-#endif /* ifdef IMU */
-#ifdef ENCODER
-  Setup_interrupt();
-#endif /* ifdef ENCODER */
-
-	// uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
-	per_c = period/1000000000.0;  //ns to s
-	//float ySteps = 0;
-	// float oldySteps = 0;
-	// float yTargetSteps = 1500;
-	// float ySpeed = 0;
-	// float ierr = 0;
-	//int ret;
-	// int dir = 1;
-	// double a = 0;
-	// double accel = 0;
-	// double delta_phi = delta_phi_start;
-	// double placeholder = period;
-	// double flip = 0;
-	// int notMovingCounter = 0;
-	// uint32_t uptime = k_uptime_ticks();
-	// uint32_t oldtime = 0;
-	printk("Uptime is %u\n",uptime);
 
 	if (!device_is_ready(P0)) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, step_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, dir_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, mode2_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, mode1_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return;
-	}
-
-	ret = gpio_pin_configure(P0, mode0_pin, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
 		return;
 	}
 
@@ -617,210 +457,13 @@ void main(void)
 	}
 
 	printk("Uart is setup \n");
-	gpio_pin_set(P0, mode2_pin, 0);
-	gpio_pin_set(P0, mode1_pin, 0);
-	gpio_pin_set(P0, mode0_pin, 0);
 
 	printk("Control Wirelessly Correct\n");
 	k_sleep(K_NSEC(2000U*1000U*1000U));
 
-
-	restart:
-	while(!mainloop){
-		k_sleep(K_NSEC(2000U));
-	}
-
-	uptime = k_uptime_ticks();
-
 	while (1) {		
 		//delta_phi = delta_phi_start/scalar;
-		if(mainloop == false){
-			goto restart;
-		}
-		//Uncomment for utilising Antiblock Measures
-		if(notMovingCounter> 100 && ((ySteps + dir*5<yTargetSteps-10) || (ySteps + dir*5>yTargetSteps+10))){
-			step_semaphore = 64;
-			for(i = 0; i<5; i++){
-				gpio_pin_set(P0, step_pin, 1);
-
-				k_sleep(K_MSEC(10));
-
-				gpio_pin_set(P0, step_pin, 0);
-
-				k_sleep(K_MSEC(10));
-
-				//ySteps = ySteps + 1.0*dir/scalar;
-			}
-			printf("Antiblock measures\n");
-			period = period*10;
-			per_c = per_c*10;
-			notMovingCounter = 0;
-		}
-
-		not_done_stepping:
-		
-		if(step_semaphore < 2*scalar && step_semaphore != -1){
-			k_sleep(K_NSEC(5000));
-			goto not_done_stepping;
-		}
-		step_semaphore = 0;
-		k_timer_start(&step_timer,K_NSEC(0),K_NSEC(period/scalar/2U));
-		if(ySteps - 10 < yTargetSteps && yTargetSteps < ySteps +10 && per_c > 0.5)
-		{
-			LOG_DBG("Target Reached \n");
-			struct commandMsg cmd = {.datum1 = 100, .datum3 = NODE};
-			coap_client_cmdSend(CCU, cmd);
-		}
-
-		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
-		// for(i = 0; i<scalar; i++){
-		// 	gpio_pin_set(P0, step_pin, 1);
-
-		// 	k_sleep(K_NSEC(period/scalar/2U));
-
-		// 	gpio_pin_set(P0, step_pin, 0);
-
-		// 	k_sleep(K_NSEC(period/scalar/2U));
-		// }
-		//ySteps = ySteps + 1.0/scalar*dir;
-		oldySteps = ySteps;
-		olderror = error;
-    	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;//*currentEncode.position/MAXENCODER;//
-		error = yTargetSteps - ySteps;
-
-		if( oldySteps == ySteps ){
-			notMovingCounter++;
-		}
-		else{
-			notMovingCounter = 0;
-		}
-		
-		oldtime = uptime;
-		//all olds have been updated
-		uptime = k_uptime_ticks();
-		if(uptime - oldtime > 0){
-			ySpeed = (error - olderror)/(uptime-oldtime);
-		}
-		else{
-			ySpeed = error - olderror;
-		}
-
-		ierr = ierr + error/3000.0*(uptime-oldtime)/32786.0*5;
-		if(kI*ierr > 20){
-			ierr = 20.0/kI;
-		}
-		if(kI*ierr < -20){
-			ierr = -20.0/kI;
-		}
-	
-
-		// if(flip!=0){
-		// 	ySpeed = ySpeed/20.0;//ySpeed/10.0;
-		// 	flip = 0;
-		// }
-
-		//yTargetstepsex = 1500 , yStepsex = 500; ySteps2 = 1000
-		//then error = 1000, error2 = 500 ySpeed = -500  ierr = 200
-		//a = 2*1000 + 200*-500 + 200/1000 = +Number slowed down by D
-
-		//yTargetstepsex = 1500 , yStepsex = 2000; ySteps2 = 2500
-		//then error = -500, error2 = -1000 ySpeed = -500  ierr = -200
-		//a = 2*-500 + 200*-500 + -200/1000
-
-		//Target = 500, ySteps = 2000 ysteps
-		//then error = -1500, error
-
-		a = kP*error + kD*ySpeed + kI*ierr;
-		if(a > 20)
-			a = 20;
-		if(a < -20)
-		    a = -20;
- 
-		accel = a*dir;
-
-		if(dir == 1*invPolarity)
-			gpio_pin_set(P0, dir_pin, 0); //Away from motor
-
-		if(dir == -1*invPolarity)
-			gpio_pin_set(P0, dir_pin, 1); //Towards motor
-
-    //printf("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr);
-	 
-    if( (delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel < 0)
-    {
-		flip = 1;
-		per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) - delta_phi/accel) - delta_phi/(accel*per_c*2);
-		accel = -accel;
-		dir = -dir;
-    }
-    else {
-        if(accel > 0.01) 
-        {
-    		    per_c = sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
-    	}
-    	else
-            if(accel < -0.01)
-    		{
-    		        per_c = -sqrt((delta_phi)*(delta_phi)/(accel*accel*per_c*per_c*4) + delta_phi/accel) - delta_phi/(accel*per_c*2);
-    		}
-	}
-
-		placeholder = per_c*1000000000;
-		period = placeholder;
-
-		// if(period*scalar < MIN_PER){
-		// 	period = MIN_PER;
-		// 	per_c = period/1000000000.0;
-		// }
-		// if(period*scalar > MAX_PER){
-		// 	period = MAX_PER;
-		// 	per_c = period/1000000000.0;
-		// 	//printf("Should have theoretically stopped, per_c = %f\n",per_c);
-		// }
-
-		// if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
-		// 	scalar = scalar*2U;  //gear down
-		// }
-		// else{
-		// 	if(period/scalar*2 < GEAR_PER-GEAR_GUARD) //if going faster than said speed
-		// 		scalar = scalar/2U;
-		// 		if(scalar < 1U) scalar = 1U;
-		// }
-		// switch(scalar){
-		// 	case 1U:
-		// 		gpio_pin_set(P0, mode2_pin, 0);
-		// 		gpio_pin_set(P0, mode1_pin, 0);
-		// 		gpio_pin_set(P0, mode0_pin, 0);
-		// 		break;
-		// 	case 2U:
-		// 		gpio_pin_set(P0, mode2_pin, 0);
-		// 		gpio_pin_set(P0, mode1_pin, 0);
-		// 		gpio_pin_set(P0, mode0_pin, 1);
-		// 		break;
-		// 	case 4U:
-		// 		gpio_pin_set(P0, mode2_pin, 0);
-		// 		gpio_pin_set(P0, mode1_pin, 1);
-		// 		gpio_pin_set(P0, mode0_pin, 0);
-		// 		break;
-		// 	case 8U:
-		// 		gpio_pin_set(P0, mode2_pin, 0);
-		// 		gpio_pin_set(P0, mode1_pin, 1);
-		// 		gpio_pin_set(P0, mode0_pin, 1);
-		// 		break;
-		// 	case 16U:
-		// 		gpio_pin_set(P0, mode2_pin, 1);
-		// 		gpio_pin_set(P0, mode1_pin, 0);
-		// 		gpio_pin_set(P0, mode0_pin, 0);
-		// 		break;
-		// 	case 32U:
-		// 		gpio_pin_set(P0, mode2_pin, 1);
-		// 		gpio_pin_set(P0, mode1_pin, 0);
-		// 		gpio_pin_set(P0, mode0_pin, 1);
-		// 		break;
-		// 	default:
-		// 		//printk("Scalar is wrong\n");
-		// 	break;
-		// }
+		k_sleep(K_USEC(200));
 	}
 
   end: return;
