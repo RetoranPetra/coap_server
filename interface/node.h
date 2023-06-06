@@ -2,11 +2,15 @@
 #define __NODE_H
 
 //Nodes 0-5
-#define NODE 3
+#define NODE 1
+#define CCU 0
+#define MIDX 1
+#define LEFTY 2
+#define RIGHTY 3
 
 #if NODE==0
-#define CONNECTIONS() int connections[] = {1, 2, 3}
-#define SERVERS 3
+#define CONNECTIONS() int connections[] = {1, 2, 3, 4 ,5}
+#define SERVERS 5
 #elif NODE==1
 #define CONNECTIONS() int connections[] = {0}
 #define SERVERS 1

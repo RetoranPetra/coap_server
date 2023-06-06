@@ -58,12 +58,13 @@
 
 #define RECEIVE_TIMEOUT 100
 
-#define invPolarity -1
+#define invPolarity 1
 #define readPolarity -1
 
 bool newMessage = false;
 bool mainloop = false;
 bool inPrinting = false;
+bool allBoardsTarget[5] = {false, false, false, false, false}; 
 
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
@@ -191,6 +192,10 @@ static uint8_t tx_buf[] =   {"nRF Connect SDK Fundamentals Course\n\r"
                              "Press 1-3 on your keyboard to toggle LEDS 1-3 on your development kit\n\r"}; //Transmission message displayed here
 //Define receive buffer and initialise it
 static uint8_t rx_buf[10] = {0}; //Buffer size set to 10
+
+int posindex = 0;
+int yTarget[] = {0,1500,2500};
+int xTarget[] = {0,2500,0};
 
 uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
 uint32_t MIN_PER = 2500000;
@@ -355,6 +360,9 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '4'){
 			k_work_submit(&provisioning_work);
 		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '5'){
+			
+		}
 		}
 
         break;
@@ -385,12 +393,42 @@ static void on_encoder_request(struct encoderMessage encode) {
 }
 
 static void on_cmd_request(struct commandMsg cmd) {
-	if(cmd.datum1 == 69)
-		mainloop = true;
-	if(cmd.datum1 == 70){
+	if(cmd.datum1 == NODE){
 		yTargetSteps = cmd.datum2;
-		ierr = 0;
 	}
+	switch(cmd.datum1){
+		case 69:
+			mainloop = true;
+			break;
+		case 70:
+			yTargetSteps = cmd.datum2;
+			ierr = 0;
+			break;
+		case 100:
+			if(NODE == CCU){
+				allBoardsTarget[cmd.datum3] = true;
+				LOG_DBG("Board Number %d has arrived",cmd.datum3);
+			}
+			if(allBoardsTarget[MIDX] && allBoardsTarget[LEFTY] && allBoardsTarget[RIGHTY]){
+				for(i = 0; i<5; i++){
+					allBoardsTarget[i] = false;
+				}
+				posindex = (posindex+1)%3;
+				struct commandMsg example = {
+				.cmd = 0,
+				.datum1 = 2,
+				.datum2 = yTarget[posindex],
+				.datum3 = 0
+				};
+				coap_client_cmdSend(-1,example);
+				example.datum1 = 1;
+				example.datum2 = xTarget[posindex];
+				coap_client_cmdSend(MIDX,example);
+				LOG_DBG("Moving to next target");
+			}
+		default:
+		break;
+}
 }
 
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
@@ -627,7 +665,12 @@ void main(void)
 		}
 		step_semaphore = 0;
 		k_timer_start(&step_timer,K_NSEC(0),K_NSEC(period/scalar/2U));
-
+		if(ySteps - 10 < yTargetSteps && yTargetSteps < ySteps +10 && per_c > 0.5)
+		{
+			LOG_DBG("Target Reached \n");
+			struct commandMsg cmd = {.datum1 = 100, .datum3 = NODE};
+			coap_client_cmdSend(CCU, cmd);
+		}
 
 		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
 		// for(i = 0; i<scalar; i++){
