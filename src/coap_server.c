@@ -643,11 +643,11 @@ void main(void)
 			for(i = 0; i<5; i++){
 				gpio_pin_set(P0, step_pin, 1);
 
-				k_sleep(K_MSEC(10));
+				k_sleep(K_MSEC(30));
 
 				gpio_pin_set(P0, step_pin, 0);
 
-				k_sleep(K_MSEC(10));
+				k_sleep(K_MSEC(30));
 
 				//ySteps = ySteps + 1.0*dir/scalar;
 			}
@@ -665,11 +665,12 @@ void main(void)
 		}
 		step_semaphore = 0;
 		k_timer_start(&step_timer,K_NSEC(0),K_NSEC(period/scalar/2U));
-		if(ySteps - 10 < yTargetSteps && yTargetSteps < ySteps +10 && per_c > 0.5)
+		if(ySteps - 100 < yTargetSteps && yTargetSteps < ySteps + 100 && per_c > 0.5)
 		{
 			LOG_DBG("Target Reached \n");
 			struct commandMsg cmd = {.datum1 = 100, .datum3 = NODE};
 			coap_client_cmdSend(CCU, cmd);
+			if(per_c > 0.8) k_sleep(K_MSEC(300));
 		}
 
 		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
