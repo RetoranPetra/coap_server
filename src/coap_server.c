@@ -58,7 +58,7 @@
 
 #define RECEIVE_TIMEOUT 100
 
-#define invPolarity 1
+#define invPolarity -1
 #define readPolarity -1
 
 bool newMessage = false;
@@ -193,7 +193,7 @@ static uint8_t tx_buf[] =   {"nRF Connect SDK Fundamentals Course\n\r"
 static uint8_t rx_buf[10] = {0}; //Buffer size set to 10
 
 uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
-uint32_t MIN_PER = 1000000;
+uint32_t MIN_PER = 2500000;
 double per_c = 0;
 float oldySteps = 0;
 float yTargetSteps = 1500;
@@ -600,24 +600,24 @@ void main(void)
 			goto restart;
 		}
 		//Uncomment for utilising Antiblock Measures
-		// if(notMovingCounter> 100 && ((ySteps + dir*5<yTargetSteps-10) || (ySteps + dir*5>yTargetSteps+10))){
-		// 	step_semaphore = 64;
-		// 	for(i = 0; i<5; i++){
-		// 		gpio_pin_set(P0, step_pin, 1);
+		if(notMovingCounter> 100 && ((ySteps + dir*5<yTargetSteps-10) || (ySteps + dir*5>yTargetSteps+10))){
+			step_semaphore = 64;
+			for(i = 0; i<5; i++){
+				gpio_pin_set(P0, step_pin, 1);
 
-		// 		k_sleep(K_MSEC(10));
+				k_sleep(K_MSEC(10));
 
-		// 		gpio_pin_set(P0, step_pin, 0);
+				gpio_pin_set(P0, step_pin, 0);
 
-		// 		k_sleep(K_MSEC(10));
+				k_sleep(K_MSEC(10));
 
-		// 		//ySteps = ySteps + 1.0*dir/scalar;
-		// 	}
-		// 	printf("Antiblock measures\n");
-		// 	period = period*10;
-		// 	per_c = per_c*10;
-		// 	notMovingCounter = 0;
-		// }
+				//ySteps = ySteps + 1.0*dir/scalar;
+			}
+			printf("Antiblock measures\n");
+			period = period*10;
+			per_c = per_c*10;
+			notMovingCounter = 0;
+		}
 
 		not_done_stepping:
 		
@@ -725,15 +725,15 @@ void main(void)
 		placeholder = per_c*1000000000;
 		period = placeholder;
 
-		if(period*scalar < MIN_PER){
-			period = MIN_PER;
-			per_c = period/1000000000.0;
-		}
-		if(period*scalar > MAX_PER){
-			period = MAX_PER;
-			per_c = period/1000000000.0;
-			//printf("Should have theoretically stopped, per_c = %f\n",per_c);
-		}
+		// if(period*scalar < MIN_PER){
+		// 	period = MIN_PER;
+		// 	per_c = period/1000000000.0;
+		// }
+		// if(period*scalar > MAX_PER){
+		// 	period = MAX_PER;
+		// 	per_c = period/1000000000.0;
+		// 	//printf("Should have theoretically stopped, per_c = %f\n",per_c);
+		// }
 
 		// if(period/scalar > GEAR_PER+GEAR_GUARD && scalar < 20U){ //if going slower than a predefined speed
 		// 	scalar = scalar*2U;  //gear down
@@ -778,7 +778,6 @@ void main(void)
 		// 		//printk("Scalar is wrong\n");
 		// 	break;
 		// }
-	//}
 	}
 
   end: return;
