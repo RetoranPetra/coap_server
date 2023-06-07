@@ -64,6 +64,7 @@ bool newMessage = false;
 bool mainloop = false;
 bool shouldMove = false;
 bool manualControl = false;
+bool shouldWait = false;
 
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
@@ -241,20 +242,21 @@ static void on_cmd_request(struct commandMsg cmd) {
 	LOG_DBG("Received message with %d and %d and %d",cmd.datum1,cmd.datum2,cmd.datum3);
 	switch(cmd.datum1){
 		case 1:
-			LOG_DBG("I am in case 1");
-			if(NODE == MIDX){
-				yTargetSteps = cmd.datum2;
-				ierr = 0;
-				LOG_DBG("I have changed target to %d",cmd.datum2);
-			}
+
 			break;
 		case 2:
-			LOG_DBG("I am in case 2");
-			if((NODE == RIGHTY) || (NODE == LEFTY)){
-				yTargetSteps = cmd.datum2;
-				ierr = 0;
-				LOG_DBG("I have changed target to %d",cmd.datum2);
+			if(cmd.datum3 == NODE){
+				shouldWait = true;
 			}
+			break;
+		case 66:
+			mainloop = false;
+			break;
+		case 67:
+			resetPosition(0);
+			break;
+		case 68:
+			LOG_DBG("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d, uptime = %u, oldtime = %u\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore,uptime, oldtime);
 			break;
 		case 69:
 			mainloop = true;
@@ -265,7 +267,7 @@ static void on_cmd_request(struct commandMsg cmd) {
 			break;
 		case 71:
 			if(NODE == MIDX)
-				yTargetSteps = 2500;
+				yTargetSteps = 2600;
 			if(NODE == RIGHTY)
 				yTargetSteps = 1500;
 			if(NODE == LEFTY)
@@ -277,9 +279,29 @@ static void on_cmd_request(struct commandMsg cmd) {
 			if(NODE == MIDX)
 				yTargetSteps = 500;
 			if(NODE == RIGHTY)
-				yTargetSteps = 2500;
+				yTargetSteps = 2600;
 			if(NODE == LEFTY)
-				yTargetSteps = 2500;
+				yTargetSteps = 2600;
+
+			ierr = 0;
+			break;
+		case 73:
+			if(NODE == MIDX)
+				yTargetSteps = 500;
+			if(NODE == RIGHTY)
+				yTargetSteps = 500;
+			if(NODE == LEFTY)
+				yTargetSteps = 500;
+
+			ierr = 0;
+			break;
+		case 74:
+			if(NODE == MIDX)
+				yTargetSteps = 10;
+			if(NODE == RIGHTY)
+				yTargetSteps = 10;
+			if(NODE == LEFTY)
+				yTargetSteps = 10;
 
 			ierr = 0;
 			break;
@@ -338,6 +360,7 @@ static void on_cmd_request(struct commandMsg cmd) {
 				shouldMove = true;
 				dir = -1;
 			}
+			break;
 		case 105:
 			if(NODE == MIDX){
 				shouldMove = false;
@@ -355,7 +378,8 @@ static void on_cmd_request(struct commandMsg cmd) {
 		case 106:
 			shouldMove = false;
 			dir = 1;
-			manualControl = !manualControl;
+			manualControl = cmd.datum3;
+			LOG_DBG("Manual control is now = %d",manualControl);
 			break;
 		default:
 		break;
@@ -500,7 +524,7 @@ void main(void)
 	// int notMovingCounter = 0;
 	// uint32_t uptime = k_uptime_ticks();
 	// uint32_t oldtime = 0;
-	printk("Uptime is %u\n",uptime);
+	LOG_DBG("fabs(-7) returns %f\n",fabs(-7));
 
 	if (!device_is_ready(P0)) {
 		return;
@@ -531,12 +555,12 @@ void main(void)
 		return;
 	}
 
-	printk("Uart is setup \n");
+	LOG_DBG("Uart is setup \n");
 	gpio_pin_set(P0, mode2_pin, 0);
 	gpio_pin_set(P0, mode1_pin, 0);
 	gpio_pin_set(P0, mode0_pin, 0);
 
-	printk("Control Wirelessly Correct\n");
+	LOG_DBG("Control Wirelessly Correct\n");
 	k_sleep(K_NSEC(2000U*1000U*1000U));
 
 
@@ -579,20 +603,30 @@ void main(void)
 			notMovingCounter = 0;
 		}
 
+		// if( ((NODE == RIGHTY) || (NODE == LEFTY)) && fabs(ySpeed) < 0.1){
+		// 	struct commandMsg cmd = {.cmd = (uint8_t) dir, .datum1 = 1, .datum2 = ySteps ,.datum3 = NODE};
+		// 	coap_client_cmdSend(-1, cmd);
+		// }
 		not_done_stepping:
 		
 		if(step_semaphore < 2*scalar && step_semaphore != -1){
 			k_sleep(K_NSEC(5000));
 			goto not_done_stepping;
 		}
+		if(shouldWait){
+			LOG_DBG("Waiting For Sync");
+			k_sleep(K_NSEC(20*period/scalar/2U));
+			shouldWait = false;
+		}
 		step_semaphore = 0;
 		k_timer_start(&step_timer,K_NSEC(0),K_NSEC(period/scalar/2U));
-		if(ySteps - 100 < yTargetSteps && yTargetSteps < ySteps + 100 && per_c > 0.5)
+		if(ySteps - 100 < yTargetSteps && yTargetSteps < ySteps + 100 && per_c > 0.8)
 		{
 			LOG_DBG("Target Reached \n");
 			struct commandMsg cmd = {.datum1 = 100, .datum2 = yTargetSteps ,.datum3 = NODE};
-			coap_client_cmdSend(CCU, cmd);
-			if(per_c > 0.8) k_sleep(K_MSEC(300+NODE));
+			coap_client_cmdSend(-1, cmd);
+			//if(per_c > 0.8) 
+			k_sleep(K_MSEC(800+NODE*100));
 		}
 
 		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
@@ -629,11 +663,11 @@ void main(void)
 		}
 
 		ierr = ierr + error/3000.0*(uptime-oldtime)/32786.0*5;
-		if(kI*ierr > 20){
-			ierr = 20.0/kI;
+		if(kI*ierr > 5){
+			ierr = 5.0/kI;
 		}
-		if(kI*ierr < -20){
-			ierr = -20.0/kI;
+		if(kI*ierr < -5){
+			ierr = -5.0/kI;
 		}
 	
 
@@ -752,14 +786,18 @@ void main(void)
 			LOG_DBG("Switch to automatic mode");
 			goto restart;
 		}
+		if(mainloop == false){
+			LOG_DBG("Restart mode");
+			goto restart;
+		}
 		if(shouldMove){
 			gpio_pin_set(P0, step_pin, 1);
 
-			k_sleep(K_NSEC(250U));
+			k_sleep(K_NSEC(MIN_PER/4U));
 
 			gpio_pin_set(P0, step_pin, 0);
 
-			k_sleep(K_NSEC(250U));
+			k_sleep(K_NSEC(MIN_PER/4U));
 		}
 		if(dir == 1*invPolarity)
 			gpio_pin_set(P0, dir_pin, 0); //Away from motor
@@ -769,6 +807,12 @@ void main(void)
     	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;
 		if(!shouldMove){
 			k_sleep(K_NSEC(3000));
+		}
+		if(ySteps < 5){
+			shouldMove = false;
+		}
+		if(ySteps > 2600){
+			shouldMove = false;
 		}
 	}
 

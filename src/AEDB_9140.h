@@ -21,6 +21,7 @@ float getFloatVel(void);
 int32_t getIntAcc(void);
 float getFloatAcc(void);
 int32_t getPosition(void);
+void resetPosition(int32_t in);
 
 void Setup_interrupt(void);
 void encoderTestLoop(void);
