@@ -56,14 +56,15 @@
 #define MAXENCODER 30000.0
 #define maxRecord 300
 
-#define RECEIVE_TIMEOUT 100
+#define RECEIVE_TIMEOUT 500
 
-#define invPolarity -1
+#define invPolarity 1
 #define readPolarity -1
 
 bool newMessage = false;
 bool mainloop = false;
-bool inPrinting = false;
+bool shouldMove = false;
+bool manualControl = false;
 bool allBoardsTarget[5] = {false, false, false, false, false}; 
 
 
@@ -393,19 +394,21 @@ static void on_encoder_request(struct encoderMessage encode) {
 }
 
 static void on_cmd_request(struct commandMsg cmd) {
-	if(cmd.datum1 == NODE){
-		
-	}
+	LOG_DBG("Received message with %d and %d and %d",cmd.datum1,cmd.datum2,cmd.datum3);
 	switch(cmd.datum1){
 		case 1:
+			LOG_DBG("I am in case 1");
 			if(NODE == MIDX){
 				yTargetSteps = cmd.datum2;
+				ierr = 0;
 				LOG_DBG("I have changed target to %d",cmd.datum2);
 			}
 			break;
 		case 2:
-			if(NODE == RIGHTY || NODE == LEFTY){
+			LOG_DBG("I am in case 2");
+			if((NODE == RIGHTY) || (NODE == LEFTY)){
 				yTargetSteps = cmd.datum2;
+				ierr = 0;
 				LOG_DBG("I have changed target to %d",cmd.datum2);
 			}
 			break;
@@ -416,28 +419,100 @@ static void on_cmd_request(struct commandMsg cmd) {
 			yTargetSteps = cmd.datum2;
 			ierr = 0;
 			break;
-		case 100:
-			if(NODE == CCU){
-				allBoardsTarget[cmd.datum3] = true;
-				LOG_DBG("Board Number %d has arrived",cmd.datum3);
+		case 71:
+			if(NODE == MIDX)
+				yTargetSteps = 2500;
+			if(NODE == RIGHTY)
+				yTargetSteps = 1500;
+			if(NODE == LEFTY)
+				yTargetSteps = 1500;
+
+			ierr = 0;
+			break;
+		case 72:
+			if(NODE == MIDX)
+				yTargetSteps = 500;
+			if(NODE == RIGHTY)
+				yTargetSteps = 2500;
+			if(NODE == LEFTY)
+				yTargetSteps = 2500;
+
+			ierr = 0;
+			break;
+		case 101:
+			if(NODE == MIDX){
+				shouldMove = true;
+				dir = 1;
 			}
-			if(allBoardsTarget[MIDX] && allBoardsTarget[LEFTY] && allBoardsTarget[RIGHTY]){
-				for(i = 0; i<5; i++){
-					allBoardsTarget[i] = false;
-				}
-				posindex = (posindex+1)%3;
-				struct commandMsg example = {
-				.cmd = 0,
-				.datum1 = 2,
-				.datum2 = yTarget[posindex],
-				.datum3 = 0
-				};
-				coap_client_cmdSend(-1,example);
-				example.datum1 = 1;
-				example.datum2 = xTarget[posindex];
-				coap_client_cmdSend(MIDX,example);
-				LOG_DBG("Moving to next target");
+			if(NODE == RIGHTY){
+				shouldMove = false;
+				dir = 1;
 			}
+			if(NODE == LEFTY){
+				shouldMove = false;
+				dir = 1;
+			}
+			break;
+		case 102:
+			if(NODE == MIDX){
+				shouldMove = true;
+				dir = -1;
+			}
+			if(NODE == RIGHTY){
+				shouldMove = false;
+				dir = 1;
+			}
+			if(NODE == LEFTY){
+				shouldMove = false;
+				dir = 1;
+			}
+			break;
+		case 103:
+			if(NODE == MIDX){
+				shouldMove = false;
+				dir = 1;
+			}
+			if(NODE == RIGHTY){
+				shouldMove = true;
+				dir = 1;
+			}
+			if(NODE == LEFTY){
+				shouldMove = true;
+				dir = 1;
+			}
+			break;
+		case 104:
+			if(NODE == MIDX){
+				shouldMove = false;
+				dir = 1;
+			}
+			if(NODE == RIGHTY){
+				shouldMove = true;
+				dir = -1;
+			}
+			if(NODE == LEFTY){
+				shouldMove = true;
+				dir = -1;
+			}
+		case 105:
+			if(NODE == MIDX){
+				shouldMove = false;
+				dir = 1;
+			}
+			if(NODE == RIGHTY){
+				shouldMove = false;
+				dir = 1;
+			}
+			if(NODE == LEFTY){
+				shouldMove = false;
+				dir = 1;
+			}
+			break;
+		case 106:
+			shouldMove = false;
+			dir = 1;
+			manualControl = !manualControl;
+			break;
 		default:
 		break;
 }
@@ -649,6 +724,12 @@ void main(void)
 		if(mainloop == false){
 			goto restart;
 		}
+		if(manualControl){
+			k_timer_stop(&step_timer);
+			step_semaphore = -1;
+			ierr = 0;
+			goto manCon;
+		}
 		//Uncomment for utilising Antiblock Measures
 		if(notMovingCounter> 100 && ((ySteps + dir*5<yTargetSteps-10) || (ySteps + dir*5>yTargetSteps+10))){
 			step_semaphore = 64;
@@ -663,7 +744,7 @@ void main(void)
 
 				//ySteps = ySteps + 1.0*dir/scalar;
 			}
-			printf("Antiblock measures\n");
+			printf("Antiblock measures");
 			period = period*10;
 			per_c = per_c*10;
 			notMovingCounter = 0;
@@ -682,7 +763,7 @@ void main(void)
 			LOG_DBG("Target Reached \n");
 			struct commandMsg cmd = {.datum1 = 100, .datum2 = yTargetSteps ,.datum3 = NODE};
 			coap_client_cmdSend(CCU, cmd);
-			if(per_c > 0.8) k_sleep(K_MSEC(300));
+			if(per_c > 0.8) k_sleep(K_MSEC(300+NODE));
 		}
 
 		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
@@ -834,6 +915,29 @@ void main(void)
 		// 		//printk("Scalar is wrong\n");
 		// 	break;
 		// }
+	}
+
+	while(1){
+		manCon:
+		if(manualControl == false){
+			goto restart;
+		}
+		if(shouldMove){
+			gpio_pin_set(P0, step_pin, 1);
+
+			k_sleep(K_NSEC(MIN_PER*2));
+
+			gpio_pin_set(P0, step_pin, 0);
+
+			k_sleep(K_NSEC(MIN_PER*2));
+		}
+		if(dir == 1*invPolarity)
+			gpio_pin_set(P0, dir_pin, 0); //Away from motor
+
+		if(dir == -1*invPolarity)
+			gpio_pin_set(P0, dir_pin, 1); //Towards motor
+    	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;
+		k_sleep(K_NSEC(3000));
 	}
 
   end: return;
