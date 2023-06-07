@@ -46,7 +46,7 @@
 #define pi 3.14159265
 #define MAXENCODER 30000.0
 
-#define RECEIVE_TIMEOUT 100
+#define RECEIVE_TIMEOUT 500
 
 bool newMessage = false;
 bool mainloop = false;
@@ -181,8 +181,10 @@ static uint8_t tx_buf[] =   {"nRF Connect SDK Fundamentals Course\n\r"
 static uint8_t rx_buf[10] = {0}; //Buffer size set to 10
 
 int posindex = 0;
-int yTarget[] = {0,1500,2500};
-int xTarget[] = {0,2500,0};
+int yTarget[] = {500,1500,2500};
+int xTarget[] = {500,2500,500};
+bool cycleToNew = false;
+bool presetsMode = false;
 
 float yTargetSteps = 1500;
 
@@ -190,8 +192,7 @@ int i = 0;
 
 //UART application callback function
 static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
-{
-	switch (evt->type) {
+{switch (evt->type) {
 		//Only defining the receiving modes
 	case UART_RX_RDY:
 		if((evt->data.rx.len) == 1){ //If something entered
@@ -199,6 +200,87 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		//Defining responses:
 		if(evt->data.rx.buf[evt->data.rx.offset] == 'w'){
 			LOG_DBG("Upwards \n");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 101,
+			  .datum2 = 101,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+			//Up code uart
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'a'){
+			LOG_DBG("Left \n");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 103,
+			  .datum2 = 103,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+			mainloop = true;
+			//Left code uart
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 's'){
+			LOG_DBG("Downwards \n");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 102,
+			  .datum2 = 102,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'd'){
+			LOG_DBG("Right \n");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 104,
+			  .datum2 = 104,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+			//Right code uart
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'f'){
+			LOG_DBG("Stay \n");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 105,
+			  .datum2 = 105,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+			//Stay Still code uart
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'm'){
+			LOG_DBG("Switch between manual and automatic\n");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 106,
+			  .datum2 = 106,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+			//Stay Still code uart
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'e'){
+			LOG_DBG("Target to 500");
+			yTargetSteps = 500;
+			// struct encoderMessage example = {.payload = yTargetSteps,
+			// .messageNum=0,.command=70};
+			// coap_client_encoderSend(1,example);
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 70,
+			  .datum2 = yTargetSteps,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+			//Down code uart
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'q'){
+			LOG_DBG("Target to 2500");
 			yTargetSteps = 2500;
 			// struct encoderMessage example = {.payload = yTargetSteps,
 			// .messageNum=0,.command=70};
@@ -211,33 +293,6 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			};
 			coap_client_cmdSend(-1,example);
 			//Up code uart
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 'a'){
-			LOG_DBG("Left \n");
-			struct encoderMessage example = {.payload = 3000,
-			.messageNum=0,.command=69};
-			coap_client_encoderSend(1,example);
-			mainloop = true;
-			//Left code uart
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 's'){
-			LOG_DBG("Downwards \n");
-			yTargetSteps = 500;
-			// struct encoderMessage example = {.payload = yTargetSteps,
-			// .messageNum=0,.command=70};
-			// coap_client_encoderSend(1,example);
-			struct commandMsg example = {
-			  .cmd = 0,
-			  .datum1 = 70,
-			  .datum2 = yTargetSteps,
-			  .datum3 = 0
-			};
-			coap_client_cmdSend(-1,example);
-			//Down code uart					
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 'd'){
-			LOG_DBG("Right \n");
-			//Right code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 't'){
 			LOG_DBG("Target 0 \n");
@@ -255,10 +310,11 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			LOG_DBG("Reset position to 0");
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == ' '){
-			LOG_DBG("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d, uptime = %u, oldtime = %u\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore,uptime, oldtime);
+			
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'p'){
-			LOG_DBG("per_c = %f, a = %f, P = %f, I = %f, D = %f\n",per_c,a,kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed);
+			presetsMode = !presetsMode;
+			LOG_DBG("Presets mode is now %d",presetsMode);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '1'){
 			LOG_DBG("All start\n");
@@ -281,7 +337,22 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			k_work_submit(&provisioning_work);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '5'){
-			
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 71,
+			  .datum2 = yTargetSteps,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '6'){
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 72,
+			  .datum2 = yTargetSteps,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
 		}
 		}
 
@@ -313,9 +384,6 @@ static void on_encoder_request(struct encoderMessage encode) {
 }
 
 static void on_cmd_request(struct commandMsg cmd) {
-	if(cmd.datum1 == NODE){
-		yTargetSteps = cmd.datum2;
-	}
 	switch(cmd.datum1){
 		case 69:
 			mainloop = true;
@@ -325,26 +393,22 @@ static void on_cmd_request(struct commandMsg cmd) {
 			break;
 		case 100:
 			if(NODE == CCU){
-				allBoardsTarget[cmd.datum3] = true;
-				LOG_DBG("Board Number %d has arrived",cmd.datum3);
-			}
-			if(allBoardsTarget[MIDX] && allBoardsTarget[LEFTY] && allBoardsTarget[RIGHTY]){
-				for(i = 0; i<5; i++){
-					allBoardsTarget[i] = false;
+				if(cmd.datum3 == MIDX){
+					if(cmd.datum2 == xTarget[posindex]){
+						allBoardsTarget[cmd.datum3] = true;
+						LOG_DBG("Board Number %d has arrived",cmd.datum3);
+					}
+				} else if((cmd.datum3 == RIGHTY) || (cmd.datum3 == LEFTY)){
+					if(cmd.datum2 == yTarget[posindex]){
+						allBoardsTarget[cmd.datum3] = true;
+						LOG_DBG("Board Number %d has arrived",cmd.datum3);
+					}
 				}
-				posindex = (posindex+1)%3;
-				struct commandMsg example = {
-				.cmd = 0,
-				.datum1 = 2,
-				.datum2 = yTarget[posindex],
-				.datum3 = 0
-				};
-				coap_client_cmdSend(-1,example);
-				example.datum1 = 1;
-				example.datum2 = xTarget[posindex];
-				coap_client_cmdSend(MIDX,example);
-				LOG_DBG("Moving to next target");
+			if(allBoardsTarget[MIDX] && allBoardsTarget[LEFTY] && allBoardsTarget[RIGHTY]){
+				cycleToNew = true;
 			}
+			}
+			
 		default:
 		break;
 }
@@ -461,7 +525,29 @@ void main(void)
 
 	while (1) {		
 		//delta_phi = delta_phi_start/scalar;
-		k_sleep(K_USEC(200));
+		if(cycleToNew && presetsMode){
+			posindex = (posindex+1)%3;
+			LOG_DBG("Cycling to pos %d",posindex);
+			k_sleep(K_USEC(300));
+			struct commandMsg example = {
+			.cmd = 0,
+			.datum1 = 2,
+			.datum2 = yTarget[posindex],
+			.datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+			k_sleep(K_USEC(300));
+			for(i = 0; i<5; i++){
+				allBoardsTarget[i] = false;
+			}
+			example.datum1 = 1;
+			example.datum2 = xTarget[posindex];
+			coap_client_cmdSend(MIDX,example);
+			LOG_DBG("Moving to next target");
+			k_sleep(K_USEC(2000));
+			cycleToNew = false;
+		}
+		k_sleep(K_USEC(2000));
 	}
 
   end: return;

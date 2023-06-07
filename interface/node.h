@@ -2,7 +2,7 @@
 #define __NODE_H
 
 //Nodes 0-5
-#define NODE 1
+#define NODE 0
 #define CCU 0
 #define MIDX 1
 #define LEFTY 2
