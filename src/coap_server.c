@@ -746,8 +746,8 @@ void main(void)
 		// }
 	}
 
+	manCon:
 	while(1){
-		manCon:
 		if(manualControl == false){
 			LOG_DBG("Switch to automatic mode");
 			goto restart;
@@ -755,11 +755,11 @@ void main(void)
 		if(shouldMove){
 			gpio_pin_set(P0, step_pin, 1);
 
-			k_sleep(K_NSEC(MIN_PER*2));
+			k_sleep(K_NSEC(250U));
 
 			gpio_pin_set(P0, step_pin, 0);
 
-			k_sleep(K_NSEC(MIN_PER*2));
+			k_sleep(K_NSEC(250U));
 		}
 		if(dir == 1*invPolarity)
 			gpio_pin_set(P0, dir_pin, 0); //Away from motor
@@ -767,7 +767,9 @@ void main(void)
 		if(dir == -1*invPolarity)
 			gpio_pin_set(P0, dir_pin, 1); //Towards motor
     	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;
-		k_sleep(K_NSEC(3000));
+		if(!shouldMove){
+			k_sleep(K_NSEC(3000));
+		}
 	}
 
   end: return;
