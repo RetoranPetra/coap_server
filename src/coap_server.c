@@ -18,7 +18,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/openthread.h>
 #include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/uart.h> //uart
 //#include <zephyr/drivers/flash.h>
 // Channel management
 #include <nrf_802154.h>
@@ -65,7 +64,6 @@ bool newMessage = false;
 bool mainloop = false;
 bool shouldMove = false;
 bool manualControl = false;
-bool allBoardsTarget[5] = {false, false, false, false, false}; 
 
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
@@ -188,16 +186,6 @@ const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 //UART device obtained
 const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
 
-//Define transmission buffer (changed from 8 to 32)
-static uint8_t tx_buf[] =   {"nRF Connect SDK Fundamentals Course\n\r"
-                             "Press 1-3 on your keyboard to toggle LEDS 1-3 on your development kit\n\r"}; //Transmission message displayed here
-//Define receive buffer and initialise it
-static uint8_t rx_buf[10] = {0}; //Buffer size set to 10
-
-int posindex = 0;
-int yTarget[] = {500,1500,2500};
-int xTarget[] = {500,2500,500};
-
 uint32_t period = 4U * 1000U * 1000U ; //ms * to_us * to_ns
 uint32_t MIN_PER = 2500000;
 double per_c = 0;
@@ -231,150 +219,6 @@ float kI = 0.072;//24.0/1000.0;
 // float kI = 1.0/1000.0;
 
 int i = 0;
-
-//UART application callback function
-static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
-{
-	switch (evt->type) {
-		//Only defining the receiving modes
-	case UART_RX_RDY:
-		if((evt->data.rx.len) == 1){ //If something entered
-
-		//Defining responses:
-		if(evt->data.rx.buf[evt->data.rx.offset] == 'w'){
-			LOG_DBG("Upwards \n");
-			ierr = 0;
-			yTargetSteps = 2500;
-			// struct encoderMessage example = {.payload = yTargetSteps,
-			// .messageNum=0,.command=70};
-			// coap_client_encoderSend(1,example);
-			struct commandMsg example = {
-			  .cmd = 0,
-			  .datum1 = 70,
-			  .datum2 = yTargetSteps,
-			  .datum3 = 0
-			};
-			coap_client_cmdSend(-1,example);
-			//Up code uart
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 'a'){
-			LOG_DBG("Left \n");
-			struct encoderMessage example = {.payload = 3000,
-			.messageNum=0,.command=69};
-			coap_client_encoderSend(1,example);
-			mainloop = true;
-			//Left code uart
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 's'){
-			LOG_DBG("Downwards \n");
-			ierr = 0;
-			yTargetSteps = 500;
-			// struct encoderMessage example = {.payload = yTargetSteps,
-			// .messageNum=0,.command=70};
-			// coap_client_encoderSend(1,example);
-			struct commandMsg example = {
-			  .cmd = 0,
-			  .datum1 = 70,
-			  .datum2 = yTargetSteps,
-			  .datum3 = 0
-			};
-			coap_client_cmdSend(-1,example);
-			//Down code uart					
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 'd'){
-			LOG_DBG("Right \n");
-			//Right code uart
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '='){
-			kD = kD + 5;
-			LOG_DBG("Kd+ is now %f \n",kD);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '-'){
-			kD = kD - 5;
-			LOG_DBG("Kd- is now %f \n",kD);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '0'){
-			kP = kP + 0.1*pi/3000;
-			LOG_DBG("Kp+ is now %f \n",kP);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '9'){
-			kP = kP - 0.1*pi/3000;
-			LOG_DBG("Kp- is now %f \n",kP);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '8'){
-			kI = kI + 2.0/1000.0;
-			LOG_DBG("KI+ is now %f \n",kI);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '7'){
-			kI = kI - 2.0/1000.0;
-			LOG_DBG("KI- is now %f \n",kI);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 't'){
-			LOG_DBG("Target 0 \n");
-			ierr = 0;
-			yTargetSteps = 0;
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 'b'){
-			LOG_DBG("Target middle \n");
-			ierr = 0;
-			yTargetSteps = 1500;
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 'x'){
-			mainloop = false;
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '['){
-			MIN_PER -= 10000;
-			LOG_DBG("MIN_PER- is now %u \n",MIN_PER);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == ']'){
-			MIN_PER += 10000;
-			LOG_DBG("MIN_PER+ is now %u \n",MIN_PER);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 'r'){
-			resetPosition(0);
-			ySteps = 0;
-			LOG_DBG("Reset position to 0");
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == ' '){
-			LOG_DBG("per_c = %f, ySteps = %f, a = %f, ySpeed = %f, dir = %d, scalar = %u, target = %f, ierr = %f, notMoving = %d, temp = %d, semaphore = %d, uptime = %u, oldtime = %u\n",per_c,ySteps,a,ySpeed,dir,scalar,yTargetSteps,ierr, notMovingCounter, TEMPORARY, step_semaphore,uptime, oldtime);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == 'p'){
-			LOG_DBG("per_c = %f, a = %f, P = %f, I = %f, D = %f\n",per_c,a,kP*(yTargetSteps-ySteps),kI*ierr,kD*ySpeed);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '1'){
-			LOG_DBG("All start\n");
-			struct commandMsg example = {
-			  .cmd = 0,
-			  .datum1 = 69,
-			  .datum2 = yTargetSteps,
-			  .datum3 = 0
-			};
-			coap_client_cmdSend(-1,example);
-			mainloop = true;
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '2'){
-			coap_client_send_provisioning_request();
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '3'){
-			serverScroll();
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '4'){
-			k_work_submit(&provisioning_work);
-		}
-		else if (evt->data.rx.buf[evt->data.rx.offset] == '5'){
-			
-		}
-		}
-
-        break;
-	case UART_RX_DISABLED: //Constant receiving
-		uart_rx_enable(dev ,rx_buf,sizeof rx_buf,RECEIVE_TIMEOUT);
-		break;
-		
-	default:
-		break;
-	}
-}
 
 struct encoderMessage currentEncode = {};
 static void on_encoder_request(struct encoderMessage encode) {
@@ -687,22 +531,6 @@ void main(void)
 		return;
 	}
 
-	//UART callback function registered
-	ret = uart_callback_set(uart, uart_cb, NULL);
-		if (ret) {
-			return;
-		}
-	//Data sent over UART
-	ret = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
-	if (ret) {
-		return;
-	}	
-	//uart_rx_enable() call to start receiving
-	ret = uart_rx_enable(uart ,rx_buf,sizeof rx_buf,RECEIVE_TIMEOUT);
-	if (ret) {
-		return;
-	}
-
 	printk("Uart is setup \n");
 	gpio_pin_set(P0, mode2_pin, 0);
 	gpio_pin_set(P0, mode1_pin, 0);
@@ -728,6 +556,7 @@ void main(void)
 			k_timer_stop(&step_timer);
 			step_semaphore = -1;
 			ierr = 0;
+			LOG_DBG("Switch to manual mode");
 			goto manCon;
 		}
 		//Uncomment for utilising Antiblock Measures
@@ -920,6 +749,7 @@ void main(void)
 	while(1){
 		manCon:
 		if(manualControl == false){
+			LOG_DBG("Switch to automatic mode");
 			goto restart;
 		}
 		if(shouldMove){
