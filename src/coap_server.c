@@ -181,13 +181,15 @@ static uint8_t tx_buf[] =   {"nRF Connect SDK Fundamentals Course\n\r"
 static uint8_t rx_buf[10] = {0}; //Buffer size set to 10
 
 int posindex = 0;
+
 int yTarget[] = {500,1500,2500};
 int xTarget[] = {500,2500,500};
 uint32_t RightPos = 696969;
 uint32_t LeftPos = 696969;
 int rightDir = 1;
 int leftDir = 1;
-uint8_t target[] = {71,72,73};
+uint8_t target[] = {71,72,73};//{75,76,77,78};//
+#define MAXSTATES 3;
 bool cycleToNew = false;
 bool presetsMode = false;
 bool canCycleToNext = true;
@@ -604,13 +606,13 @@ void main(void)
 		//delta_phi = delta_phi_start/scalar;
 		if(cycleToNew && presetsMode){
 			k_sleep(K_MSEC(200));
-			posindex = (posindex+1)%3;
+			posindex = (posindex+1)%MAXSTATES;
 			LOG_DBG("Cycling to pos %d",posindex);
 			k_sleep(K_USEC(300));
 			struct commandMsg example = {
 			.cmd = 0,
 			.datum1 = target[posindex],
-			.datum2 = 77,
+			.datum2 = 6969,
 			.datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
