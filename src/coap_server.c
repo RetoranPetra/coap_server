@@ -267,33 +267,36 @@ static void on_cmd_request(struct commandMsg cmd) {
 			break;
 		case 71:
 			if(NODE == MIDX)
-				yTargetSteps = 2600;
+				yTargetSteps = 800;
 			if(NODE == RIGHTY)
-				yTargetSteps = 1500;
+				yTargetSteps = 800;
 			if(NODE == LEFTY)
-				yTargetSteps = 1500;
+				yTargetSteps = 800;
 
 			ierr = 0;
+			error = 0;
 			break;
 		case 72:
 			if(NODE == MIDX)
-				yTargetSteps = 500;
+				yTargetSteps = 1600;
 			if(NODE == RIGHTY)
-				yTargetSteps = 2600;
+				yTargetSteps = 800;
 			if(NODE == LEFTY)
-				yTargetSteps = 2600;
+				yTargetSteps = 800;
 
 			ierr = 0;
+			error = 0;
 			break;
 		case 73:
 			if(NODE == MIDX)
-				yTargetSteps = 500;
+				yTargetSteps = 1200;
 			if(NODE == RIGHTY)
-				yTargetSteps = 500;
+				yTargetSteps = 1600;
 			if(NODE == LEFTY)
-				yTargetSteps = 500;
+				yTargetSteps = 1600;
 
 			ierr = 0;
+			error = 0;
 			break;
 		case 74:
 			if(NODE == MIDX)
@@ -304,6 +307,51 @@ static void on_cmd_request(struct commandMsg cmd) {
 				yTargetSteps = 10;
 
 			ierr = 0;
+			error = 0;
+			break;
+		case 75:
+			if(NODE == MIDX)
+				yTargetSteps = 1000;
+			if(NODE == RIGHTY)
+				yTargetSteps = 1000;
+			if(NODE == LEFTY)
+				yTargetSteps = 1000;
+
+			ierr = 0;
+			error = 0;
+			break;
+		case 76:
+			if(NODE == MIDX)
+				yTargetSteps = 1600;
+			if(NODE == RIGHTY)
+				yTargetSteps = 1000;
+			if(NODE == LEFTY)
+				yTargetSteps = 1000;
+
+			ierr = 0;
+			error = 0;
+			break;
+		case 77:
+			if(NODE == MIDX)
+				yTargetSteps = 1000;
+			if(NODE == RIGHTY)
+				yTargetSteps = 1600;
+			if(NODE == LEFTY)
+				yTargetSteps = 1600;
+
+			ierr = 0;
+			error = 0;
+			break;
+		case 78:
+			if(NODE == MIDX)
+				yTargetSteps = 1600;
+			if(NODE == RIGHTY)
+				yTargetSteps = 1600;
+			if(NODE == LEFTY)
+				yTargetSteps = 1600;
+
+			ierr = 0;
+			error = 0;
 			break;
 		case 101:
 			if(NODE == MIDX){
@@ -620,13 +668,13 @@ void main(void)
 		}
 		step_semaphore = 0;
 		k_timer_start(&step_timer,K_NSEC(0),K_NSEC(period/scalar/2U));
-		if(ySteps - 100 < yTargetSteps && yTargetSteps < ySteps + 100 && per_c > 0.8)
+		if(ySteps - 150 < yTargetSteps && yTargetSteps < ySteps + 150 && per_c > 0.4)
 		{
 			LOG_DBG("Target Reached \n");
 			struct commandMsg cmd = {.datum1 = 100, .datum2 = yTargetSteps ,.datum3 = NODE};
 			coap_client_cmdSend(-1, cmd);
 			//if(per_c > 0.8) 
-			k_sleep(K_MSEC(800+NODE*100));
+			k_sleep(K_MSEC(400+NODE*250));
 		}
 
 		//Was moving this to a timer function to not clutter main and to use this time to send messages for synchronisation.
