@@ -183,8 +183,16 @@ static uint8_t rx_buf[10] = {0}; //Buffer size set to 10
 int posindex = 0;
 int yTarget[] = {500,1500,2500};
 int xTarget[] = {500,2500,500};
+uint32_t RightPos = 696969;
+uint32_t LeftPos = 696969;
+int rightDir = 1;
+int leftDir = 1;
+uint8_t target[] = {71,72,73};
 bool cycleToNew = false;
 bool presetsMode = false;
+bool canCycleToNext = true;
+bool syncWork = false;
+bool manualControl = false;
 
 float yTargetSteps = 1500;
 
@@ -254,12 +262,13 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			//Stay Still code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'm'){
-			LOG_DBG("Switch between manual and automatic\n");
+			manualControl = !manualControl;
+			LOG_DBG("Switch to manual = %d\n",manualControl);
 			struct commandMsg example = {
 			  .cmd = 0,
 			  .datum1 = 106,
 			  .datum2 = 106,
-			  .datum3 = 0
+			  .datum3 = manualControl
 			};
 			coap_client_cmdSend(-1,example);
 			//Stay Still code uart
@@ -303,13 +312,36 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			yTargetSteps = 1500;
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'x'){
+			LOG_DBG("No more main");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 66,
+			  .datum2 = 0,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
 			mainloop = false;
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'r'){
 			resetPosition(0);
 			LOG_DBG("Reset position to 0");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 67,
+			  .datum2 = 0,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == ' '){
+			LOG_DBG("Asking to print Details");
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 68,
+			  .datum2 = 0,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
 			
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'p'){
@@ -354,6 +386,15 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			};
 			coap_client_cmdSend(-1,example);
 		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == '7'){
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 73,
+			  .datum2 = yTargetSteps,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+		}
 		}
 
         break;
@@ -365,6 +406,19 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		break;
 	}
 }
+
+void wait_work_handler(struct k_work *work)
+{
+	LOG_DBG("I have allowed the change to the next pattern");
+	canCycleToNext = true;
+}
+K_WORK_DEFINE(wait_work, wait_work_handler);
+
+void wait_timer_handler(struct k_timer *timer_id)
+{
+	k_work_submit(&wait_work);
+}
+K_TIMER_DEFINE(wait_timer, wait_timer_handler, NULL);
 
 struct encoderMessage currentEncode = {};
 static void on_encoder_request(struct encoderMessage encode) {
@@ -385,6 +439,34 @@ static void on_encoder_request(struct encoderMessage encode) {
 
 static void on_cmd_request(struct commandMsg cmd) {
 	switch(cmd.datum1){
+		case 1:
+			LOG_DBG("Received message with %d and %d and %d",cmd.datum1,cmd.datum2,cmd.datum3);
+			if(cmd.datum3 == RIGHTY){
+				RightPos = cmd.datum2;
+				if(cmd.cmd == (uint8_t) -1){
+					rightDir = -1;
+				}
+				else{
+					rightDir = 1;
+				}
+			}
+			if(cmd.datum3 == LEFTY){
+				LeftPos = cmd.datum2;
+				if(cmd.cmd == (uint8_t) -1){
+					leftDir = -1;
+				}
+				else{
+					leftDir = 1;
+				}
+			}
+			if((RightPos < 696969) && (LeftPos < 696969)){
+				LOG_DBG("Gonna Sync them");
+				syncWork = true;
+			}
+			break;
+		case 2:
+			
+			break;
 		case 69:
 			mainloop = true;
 			break;
@@ -393,19 +475,14 @@ static void on_cmd_request(struct commandMsg cmd) {
 			break;
 		case 100:
 			if(NODE == CCU){
-				if(cmd.datum3 == MIDX){
-					if(cmd.datum2 == xTarget[posindex]){
-						allBoardsTarget[cmd.datum3] = true;
-						LOG_DBG("Board Number %d has arrived",cmd.datum3);
+				allBoardsTarget[cmd.datum3] = true;
+				LOG_DBG("Board Number %d has arrived",cmd.datum3);
+				if(allBoardsTarget[MIDX] && allBoardsTarget[LEFTY] && allBoardsTarget[RIGHTY]){
+					if(canCycleToNext){
+						cycleToNew = true;
+						canCycleToNext = false;
+						k_timer_start(&wait_timer,K_MSEC(2000),K_FOREVER);
 					}
-				} else if((cmd.datum3 == RIGHTY) || (cmd.datum3 == LEFTY)){
-					if(cmd.datum2 == yTarget[posindex]){
-						allBoardsTarget[cmd.datum3] = true;
-						LOG_DBG("Board Number %d has arrived",cmd.datum3);
-					}
-				}
-			if(allBoardsTarget[MIDX] && allBoardsTarget[LEFTY] && allBoardsTarget[RIGHTY]){
-				cycleToNew = true;
 			}
 			}
 			
@@ -526,27 +603,52 @@ void main(void)
 	while (1) {		
 		//delta_phi = delta_phi_start/scalar;
 		if(cycleToNew && presetsMode){
+			k_sleep(K_MSEC(200));
 			posindex = (posindex+1)%3;
 			LOG_DBG("Cycling to pos %d",posindex);
 			k_sleep(K_USEC(300));
 			struct commandMsg example = {
 			.cmd = 0,
-			.datum1 = 2,
-			.datum2 = yTarget[posindex],
+			.datum1 = target[posindex],
+			.datum2 = 77,
 			.datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
-			k_sleep(K_USEC(300));
-			for(i = 0; i<5; i++){
-				allBoardsTarget[i] = false;
-			}
-			example.datum1 = 1;
-			example.datum2 = xTarget[posindex];
-			coap_client_cmdSend(MIDX,example);
 			LOG_DBG("Moving to next target");
 			k_sleep(K_USEC(2000));
 			cycleToNew = false;
+			for(i = 0; i<5; i++){
+				allBoardsTarget[i] = false;
+			}
 		}
+		// if(syncWork){
+		// 	//700 - 600 = 100/1
+		// 	//600 - 700 = -100/-1
+		// 	if(rightDir*(RightPos-LeftPos) > 200){//Right is ahead
+		// 	struct commandMsg example = {
+		// 	.cmd = 0,
+		// 	.datum1 = 2,
+		// 	.datum2 = 0,
+		// 	.datum3 = RIGHTY
+		// 	};
+		// 	coap_client_cmdSend(-1,example);
+		// 	LOG_DBG("Told Right to wait");
+		// 	LeftPos = 696969;
+		// 	RightPos = 696969;
+		// 	}else if(leftDir*(LeftPos-RightPos) > 200){//Right is ahead
+		// 		struct commandMsg example = {
+		// 		.cmd = 0,
+		// 		.datum1 = 2,
+		// 		.datum2 = 0,
+		// 		.datum3 = LEFTY
+		// 		};
+		// 		coap_client_cmdSend(-1,example);
+		// 		LOG_DBG("Told Left to wait");
+		// 		LeftPos = 696969;
+		// 		RightPos = 696969;
+		// 		}
+		// 	syncWork = false;
+		// }
 		k_sleep(K_USEC(2000));
 	}
 
