@@ -64,6 +64,7 @@ bool newMessage = false;
 bool mainloop = false;
 bool shouldMove = false;
 bool manualControl = false;
+bool forcedStep = false;
 bool shouldWait = false;
 
 
@@ -356,6 +357,7 @@ static void on_cmd_request(struct commandMsg cmd) {
 		case 101:
 			if(NODE == MIDX){
 				shouldMove = true;
+				forcedStep = true;
 				dir = 1;
 			}
 			if(NODE == RIGHTY){
@@ -370,6 +372,7 @@ static void on_cmd_request(struct commandMsg cmd) {
 		case 102:
 			if(NODE == MIDX){
 				shouldMove = true;
+				forcedStep = true;
 				dir = -1;
 			}
 			if(NODE == RIGHTY){
@@ -388,10 +391,12 @@ static void on_cmd_request(struct commandMsg cmd) {
 			}
 			if(NODE == RIGHTY){
 				shouldMove = true;
+				forcedStep = true;
 				dir = 1;
 			}
 			if(NODE == LEFTY){
 				shouldMove = true;
+				forcedStep = true;
 				dir = 1;
 			}
 			break;
@@ -402,10 +407,12 @@ static void on_cmd_request(struct commandMsg cmd) {
 			}
 			if(NODE == RIGHTY){
 				shouldMove = true;
+				forcedStep = true;
 				dir = -1;
 			}
 			if(NODE == LEFTY){
 				shouldMove = true;
+				forcedStep = true;
 				dir = -1;
 			}
 			break;
@@ -838,7 +845,13 @@ void main(void)
 			LOG_DBG("Restart mode");
 			goto restart;
 		}
-		if(shouldMove){
+		if(dir == 1*invPolarity)
+			gpio_pin_set(P0, dir_pin, 0); //Away from motor
+
+		if(dir == -1*invPolarity)
+			gpio_pin_set(P0, dir_pin, 1); //Towards motor
+		if(shouldMove || forcedStep){
+			forcedStep = false;
 			gpio_pin_set(P0, step_pin, 1);
 
 			k_sleep(K_NSEC(MIN_PER/4U));
@@ -847,19 +860,14 @@ void main(void)
 
 			k_sleep(K_NSEC(MIN_PER/4U));
 		}
-		if(dir == 1*invPolarity)
-			gpio_pin_set(P0, dir_pin, 0); //Away from motor
-
-		if(dir == -1*invPolarity)
-			gpio_pin_set(P0, dir_pin, 1); //Towards motor
     	ySteps = 3000.0*getPosition()/MAXENCODER*readPolarity;
 		if(!shouldMove){
 			k_sleep(K_NSEC(3000));
 		}
-		if(ySteps < 5){
+		if(ySteps < 20){
 			shouldMove = false;
 		}
-		if(ySteps > 2600){
+		if(ySteps > 2300){
 			shouldMove = false;
 		}
 	}
