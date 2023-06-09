@@ -193,6 +193,8 @@ uint8_t target[] = {71,72,73};//{75,76,77,78};//
 bool cycleToNew = false;
 bool presetsMode = false;
 bool canCycleToNext = true;
+bool forceCycle = false;
+bool fastCycle = false;
 bool syncWork = false;
 bool manualControl = false;
 
@@ -290,6 +292,10 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			coap_client_cmdSend(-1,example);
 			//Down code uart
 		}
+		else if (evt->data.rx.buf[evt->data.rx.offset] == 'n'){
+			fastCycle = !fastCycle;
+			LOG_DBG("Fast cycling = %d\n",fastCycle);
+		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'q'){
 			LOG_DBG("Target to 2500");
 			yTargetSteps = 2500;
@@ -308,10 +314,25 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 't'){
 			LOG_DBG("Target 0 \n");
 			yTargetSteps = 0;
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 70,
+			  .datum2 = yTargetSteps,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
+			//Down code uart
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'b'){
 			LOG_DBG("Target middle \n");
 			yTargetSteps = 1500;
+			struct commandMsg example = {
+			  .cmd = 0,
+			  .datum1 = 70,
+			  .datum2 = yTargetSteps,
+			  .datum3 = 0
+			};
+			coap_client_cmdSend(-1,example);
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'x'){
 			LOG_DBG("No more main");
@@ -409,10 +430,26 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 	}
 }
 
+void fast_work_handler(struct k_work *work)
+{
+	canCycleToNext = true;
+	cycleToNew = true;
+}
+K_WORK_DEFINE(fast_work, fast_work_handler);
+
+void fast_timer_handler(struct k_timer *timer_id)
+{
+	k_work_submit(&fast_work);
+}
+K_TIMER_DEFINE(fast_timer, fast_timer_handler, NULL);
+
 void wait_work_handler(struct k_work *work)
 {
 	LOG_DBG("I have allowed the change to the next pattern");
 	canCycleToNext = true;
+	// if(fastCycle){
+	// 	k_timer_start(&fast_timer,K_MSEC(2000),K_FOREVER);
+	// }
 }
 K_WORK_DEFINE(wait_work, wait_work_handler);
 
@@ -621,6 +658,10 @@ void main(void)
 			cycleToNew = false;
 			for(i = 0; i<5; i++){
 				allBoardsTarget[i] = false;
+			}
+			if(fastCycle){
+				k_timer_stop(&wait_timer);
+				k_timer_start(&fast_timer,K_MSEC(3000),K_FOREVER);
 			}
 		}
 		// if(syncWork){
