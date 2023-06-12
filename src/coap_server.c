@@ -42,20 +42,21 @@
 #include <math.h>
 /* 1000 nsec = 1 usec */
 //#define MIN_PER 1000000 //1 ms
-#define full_length_in_steps 3000
-#define pi 3.14159265
-#define MAXENCODER 30000.0
+#define full_length_in_steps 3000 //1 meter in motors steps is 3000, our gantry is 1 m x 1 m x 1 m
+#define pi 3.14159265 //pi
+#define MAXENCODER 30000.0 //1 meter in encoder steps, 30000 encoder steps = 3000 motor steps
 
-#define RECEIVE_TIMEOUT 500
+#define RECEIVE_TIMEOUT 500 //used for reading UART inputs
 
 bool newMessage = false;
-bool mainloop = false;
+bool mainloop = false; //Main does not start until this becomes true
 bool inPrinting = false;
-bool allBoardsTarget[5] = {false, false, false, false, false}; 
+bool allBoardsTarget[5] = {false, false, false, false, false}; //keep track of whether or not all boards have arrived at their required targets
 
 
 LOG_MODULE_REGISTER(coap_server, CONFIG_COAP_SERVER_LOG_LEVEL);
-
+////////////////////////
+//provisioning is needed to connect one board with another, however, messages can be broadcasted and received without prior pairing
 #define OT_CONNECTION_LED DK_LED1
 #define PROVISIONING_LED DK_LED3
 #define LIGHT_LED DK_LED4
@@ -154,55 +155,56 @@ static void on_thread_state_changed(otChangedFlags flags,
     }
   }
 }
-
-static void on_generic_request(char *msg) {
+/////////////////////////// END OF PROVISIONING STUFF
+static void on_generic_request(char *msg) {//unused
   // Something to deal with message would normally go here. However, message is
   // just character string so it doesn't matter.
   LOG_INF("Generic Request event execution!");
 }
 
-static void on_float_request(double num) { LOG_INF("Number is: %f", num); }
-static void on_percentage_request(struct percentageStruct percent) {
+static void on_float_request(double num) { LOG_INF("Number is: %f", num); }//unused, but can be useful
+static void on_percentage_request(struct percentageStruct percent) {//unused, but can be useful
   ARG_UNUSED(percent);
   LOG_INF("Percentage request callback");
 }
-struct encoderMessage example = {
+struct encoderMessage example = {//One way of sending sensor information
       .payload = 3000, .messageNum = 0, .command = 20};
 
-const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+const struct device *P0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));//Port for changing pins, ununsed on the CCU
 
 //UART device obtained
 const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
 
-//Define transmission buffer (changed from 8 to 32)
+//Define transmission buffer (changed from 8 to 32). Not used, only for checking if uart working
 static uint8_t tx_buf[] =   {"nRF Connect SDK Fundamentals Course\n\r"
                              "Press 1-3 on your keyboard to toggle LEDS 1-3 on your development kit\n\r"}; //Transmission message displayed here
 //Define receive buffer and initialise it
 static uint8_t rx_buf[10] = {0}; //Buffer size set to 10
 
-int posindex = 0;
+int posindex = 0; //keep track of current positon
 
-int yTarget[] = {500,1500,2500};
-int xTarget[] = {500,2500,500};
-uint32_t RightPos = 696969;
-uint32_t LeftPos = 696969;
-int rightDir = 1;
-int leftDir = 1;
-uint8_t target[] = {71,72,73};//{75,76,77,78};//
-#define MAXSTATES 3;
-bool cycleToNew = false;
-bool presetsMode = false;
-bool canCycleToNext = true;
+int yTarget[] = {500,1500,2500}; //unused
+int xTarget[] = {500,2500,500};//unused
+uint32_t RightPos = 696969;//unused, for synchronisation of RightY and LeftY motors
+uint32_t LeftPos = 696969;//unused, for synchronisation of RightY and LeftY motors
+int rightDir = 1;//unused, for synchronisation of RightY and LeftY motors
+int leftDir = 1;//unused, for synchronisation of RightY and LeftY motors
+uint8_t target[] = {71,72,73};//{75,76,77,78};// //positions to cycle through in automatic mode
+#define MAXSTATES 3; //max number of positions to cycle through in automatic mode. Number of elements of 'target'
+bool cycleToNew = false; //ready to move to the next target
+bool presetsMode = false; //cycling through the preset positions, or not
+bool canCycleToNext = true; 
 bool forceCycle = false;
 bool fastCycle = false;
-bool syncWork = false;
-bool manualControl = false;
+bool syncWork = false; 
+bool manualControl = false; //switch between manual control and cycling automatically through preset positions
 
-float yTargetSteps = 1500;
+float yTargetSteps = 1500; //target, just a placeholder
 
-int i = 0;
+int i = 0; //counter for loops
 
 //UART application callback function
+//Check this function to see what buttonscan be pressed to do everything form the CCU
 static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
 {switch (evt->type) {
 		//Only defining the receiving modes
@@ -210,6 +212,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		if((evt->data.rx.len) == 1){ //If something entered
 
 		//Defining responses:
+		//MANUAL MODE INPUTS WASD
 		if(evt->data.rx.buf[evt->data.rx.offset] == 'w'){
 			LOG_DBG("Upwards \n");
 			struct commandMsg example = {
@@ -219,7 +222,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
-			//Up code uart
+			//Up code uart (positive X direction in manual mode)
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'a'){
 			LOG_DBG("Left \n");
@@ -265,6 +268,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			coap_client_cmdSend(-1,example);
 			//Stay Still code uart
 		}
+		//END OF MANUAL MODE INPUTS WASD
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'm'){
 			manualControl = !manualControl;
 			LOG_DBG("Switch to manual = %d\n",manualControl);
@@ -275,7 +279,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = manualControl
 			};
 			coap_client_cmdSend(-1,example);
-			//Stay Still code uart
+			//Switch between manual or automatic by inputting m
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'e'){
 			LOG_DBG("Target to 500");
@@ -290,11 +294,12 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
-			//Down code uart
+			//Target a preset point of (500,500)
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'n'){
 			fastCycle = !fastCycle;
 			LOG_DBG("Fast cycling = %d\n",fastCycle);
+			//make the board cycle between the points faster
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'q'){
 			LOG_DBG("Target to 2500");
@@ -309,7 +314,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
-			//Up code uart
+			//Target a preset point of (2500,2500)
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 't'){
 			LOG_DBG("Target 0 \n");
@@ -321,7 +326,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
-			//Down code uart
+			//Target a preset point of (0,0), that is come back to initial position
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'b'){
 			LOG_DBG("Target middle \n");
@@ -333,6 +338,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
+			////Target a preset point of (1500,1500)
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'x'){
 			LOG_DBG("No more main");
@@ -344,6 +350,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			};
 			coap_client_cmdSend(-1,example);
 			mainloop = false;
+			//Tell all boards to stop operation
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'r'){
 			resetPosition(0);
@@ -355,6 +362,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
+			//Calibrate all boards to consider current position is the (0,0) position
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == ' '){
 			LOG_DBG("Asking to print Details");
@@ -365,11 +373,12 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
-			
+			//ask all nodes to output useful information for debugging
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == 'p'){
 			presetsMode = !presetsMode;
 			LOG_DBG("Presets mode is now %d",presetsMode);
+			//change between just inputing targets and automatic cycling through said targets
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '1'){
 			LOG_DBG("All start\n");
@@ -381,15 +390,19 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			};
 			coap_client_cmdSend(-1,example);
 			mainloop = true;
+			//Send the message to start the main loop of every node
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '2'){
 			coap_client_send_provisioning_request();
+			//send a provisioning request for pairing
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '3'){
 			serverScroll();
+			//change who to send messages to. Unused
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '4'){
 			k_work_submit(&provisioning_work);
+			//check if received a provisioning request for pairing
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '5'){
 			struct commandMsg example = {
@@ -399,6 +412,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
+			//move to preset position 71
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '6'){
 			struct commandMsg example = {
@@ -408,6 +422,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
+			//move to preset position 72
 		}
 		else if (evt->data.rx.buf[evt->data.rx.offset] == '7'){
 			struct commandMsg example = {
@@ -417,6 +432,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 			  .datum3 = 0
 			};
 			coap_client_cmdSend(-1,example);
+			//move to preset position 73
 		}
 		}
 
@@ -430,7 +446,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 	}
 }
 
-void fast_work_handler(struct k_work *work)
+void fast_work_handler(struct k_work *work) //cycle quickly through the presets. Only if set to true by inputting 'n' on uart
 {
 	canCycleToNext = true;
 	cycleToNew = true;
@@ -441,9 +457,9 @@ void fast_timer_handler(struct k_timer *timer_id)
 {
 	k_work_submit(&fast_work);
 }
-K_TIMER_DEFINE(fast_timer, fast_timer_handler, NULL);
+K_TIMER_DEFINE(fast_timer, fast_timer_handler, NULL); //set a timer to cycle between the presets
 
-void wait_work_handler(struct k_work *work)
+void wait_work_handler(struct k_work *work) //wait for a certain time after sending a new target before checking if it has been achieved
 {
 	LOG_DBG("I have allowed the change to the next pattern");
 	canCycleToNext = true;
@@ -459,26 +475,26 @@ void wait_timer_handler(struct k_timer *timer_id)
 }
 K_TIMER_DEFINE(wait_timer, wait_timer_handler, NULL);
 
-struct encoderMessage currentEncode = {};
+struct encoderMessage currentEncode = {}; //encoder information message sending
 static void on_encoder_request(struct encoderMessage encode) {
   //LOG_DBG("Message Number: %i\nPosition:%i,Velocity:%i",encode.messageNum,encode.position,encode.velocity);
   //LOG_DBG("Encoder request callback!");
-  if (currentEncode.messageNum + 1 != encode.messageNum) {
-    LOG_INF("Dropped %d!", encode.messageNum - currentEncode.messageNum + 1);
-  }
-  currentEncode = encode;
-  if(currentEncode.command == 69){
-	mainloop = true;
-  }
-  if(currentEncode.command == 70){
-	yTargetSteps = currentEncode.payload;
-  }
-  newMessage = true;
+	if (currentEncode.messageNum + 1 != encode.messageNum) { //see how many messages have been dropped
+		LOG_INF("Dropped %d!", encode.messageNum - currentEncode.messageNum + 1);
+	}
+	currentEncode = encode; //update the currentEncode variable
+	if(currentEncode.command == 69){ //if the message carries certain commands, execute them
+		mainloop = true; //command 69 starts the main loop of a node
+	}
+	if(currentEncode.command == 70){  //command 70 changes the target of a node
+		yTargetSteps = currentEncode.payload;
+	}
+	newMessage = true;
 }
 
 static void on_cmd_request(struct commandMsg cmd) {
 	switch(cmd.datum1){
-		case 1:
+		case 1: //case 1 is for synchronisation between Right and Left motors. Unused right now
 			LOG_DBG("Received message with %d and %d and %d",cmd.datum1,cmd.datum2,cmd.datum3);
 			if(cmd.datum3 == RIGHTY){
 				RightPos = cmd.datum2;
@@ -506,13 +522,13 @@ static void on_cmd_request(struct commandMsg cmd) {
 		case 2:
 			
 			break;
-		case 69:
+		case 69: //case 69 is for starting a node. Unused on the CCU
 			mainloop = true;
 			break;
-		case 70:
+		case 70: //case 70 is for changing the target of the node to datum2. Unused on the CCU
 			yTargetSteps = cmd.datum2;
 			break;
-		case 100:
+		case 100: //if received message from node that it has reached the target, see if all nodes reached the target and move to the next position if yes
 			if(NODE == CCU){
 				allBoardsTarget[cmd.datum3] = true;
 				LOG_DBG("Board Number %d has arrived",cmd.datum3);
@@ -529,7 +545,7 @@ static void on_cmd_request(struct commandMsg cmd) {
 		break;
 }
 }
-
+//openthread functions
 static struct openthread_state_changed_cb ot_state_chaged_cb = {
     .state_changed_cb = on_thread_state_changed};
 #endif
@@ -573,6 +589,7 @@ void main(void)
     // Need to sleep at start for logs to display correctly.
   k_msleep(1000);
 #ifdef SERVER
+//initialise openthread functions
   int ret;
 
   LOG_INF("Start CoAP-server sample with Node %d",NODE);
@@ -639,16 +656,18 @@ void main(void)
 	printk("Control Wirelessly Correct\n");
 	k_sleep(K_NSEC(2000U*1000U*1000U));
 
+
+	//The CCU does not do anything in MAIN besides waiting for data form the motor actuating nodes and sending them targets or receiving their positons.
 	while (1) {		
 		//delta_phi = delta_phi_start/scalar;
-		if(cycleToNew && presetsMode){
+		if(cycleToNew && presetsMode){ //if it shoudl move to the next target, send the message to move to the next target
 			k_sleep(K_MSEC(200));
-			posindex = (posindex+1)%MAXSTATES;
+			posindex = (posindex+1)%MAXSTATES; //index of next target
 			LOG_DBG("Cycling to pos %d",posindex);
 			k_sleep(K_USEC(300));
 			struct commandMsg example = {
 			.cmd = 0,
-			.datum1 = target[posindex],
+			.datum1 = target[posindex], //will be a number like 71, 72 or 73, each corresponding to a agreed position
 			.datum2 = 6969,
 			.datum3 = 0
 			};
@@ -657,13 +676,14 @@ void main(void)
 			k_sleep(K_USEC(2000));
 			cycleToNew = false;
 			for(i = 0; i<5; i++){
-				allBoardsTarget[i] = false;
+				allBoardsTarget[i] = false; //reset the fact that all boards have achieved their target
 			}
-			if(fastCycle){
+			if(fastCycle){ //if fast mode. Cycle every 3 seconds, even if the target is not reached, to Show degradation with control
 				k_timer_stop(&wait_timer);
 				k_timer_start(&fast_timer,K_MSEC(3000),K_FOREVER);
 			}
 		}
+		//Used to be for Synchronising the motors, sometimes fails, hence, not used in the final product for security
 		// if(syncWork){
 		// 	//700 - 600 = 100/1
 		// 	//600 - 700 = -100/-1
